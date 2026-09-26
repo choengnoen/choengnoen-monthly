@@ -15,10 +15,11 @@
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/smartcrop@2.0.5/smartcrop.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/lite.umd.js"></script>
+<script src="dsel.js"></script>
 <script src="firebase-layer.js"></script>
 <script src="report-engine.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600&family=Prompt:ital,wght@0,400;0,600;1,600&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700&family=Prompt:ital,wght@0,400;0,600;1,600&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#182430; --ink-soft:#4d5a66; --ink-mute:#8792a0;
@@ -64,11 +65,15 @@ label.f{display:block;font-size:13px;color:var(--ink-soft);margin:0 0 4px;font-w
 #loginScreen{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;background:linear-gradient(160deg,#0a2540 0%,#123a5e 55%,#1f5fbf 100%)}
 .login-card{width:100%;max-width:410px;background:#fff;border-radius:18px;padding:30px 28px 26px;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center}
 .login-card img{width:72px;height:72px;margin:0 auto 6px;display:block}
-.login-card h1{font-size:22px;margin:4px 0 2px;color:var(--navy-900)}
-.login-card .sub{margin:0 0 18px;font-size:13px;color:var(--ink-mute)}
+.login-card h1{font-size:22px;margin:4px 0 2px;color:var(--navy-900);font-weight:700;line-height:1.55}
+.login-card .sub{margin:0 0 18px;font-size:13px;color:var(--ink-mute);line-height:1.55}
 .login-card form{text-align:left;display:grid;gap:12px}
-.login-card label.f{font-size:12.5px;margin-bottom:5px}
-.login-h3{margin:0;font-size:16px;color:var(--ink)}
+.login-card label.f{font-size:12.5px;margin-bottom:5px;line-height:1.55}
+.login-h3{margin:0;font-size:16px;color:var(--ink);font-weight:700;line-height:1.55}
+/* ช่องกรอก/ปุ่มในหน้าล็อกอิน ให้สูงเท่าระบบงานอุบัติเหตุพอดี (ช่องเลือกชื่อ 37px · ช่องรหัสผ่าน 36px · ปุ่ม 40px) */
+.login-card input,.login-card select{font-family:'Sarabun',sans-serif;font-size:14.5px;line-height:normal;padding:8px 10px}
+.login-card .btn-primary{font-family:'Kanit',sans-serif;font-size:14px;line-height:normal;padding:8px 16px;border-radius:10px}
+#loginPwWrap{margin-bottom:2px}
 .err{color:var(--red);font-size:14px;min-height:20px}
 .login-card .err:empty{display:none}
 .demo-note{background:var(--amber-bg);color:#7a4300;border-radius:10px;padding:10px 12px;font-size:13px;text-align:left;margin-bottom:14px}
@@ -76,15 +81,16 @@ label.f{display:block;font-size:13px;color:var(--ink-soft);margin:0 0 4px;font-w
 /* โครงหน้า */
 header.top{position:sticky;top:0;z-index:20;background:var(--navy-900);color:#fff;display:flex;align-items:center;gap:14px;padding:10px 20px;flex-wrap:wrap}
 header.top img{width:40px;height:40px}
-header.top .t1{font-family:'Kanit';font-size:18px;line-height:1.2}
-header.top .t2{font-size:13px;opacity:.75}
+/* ชื่อระบบ — ฟอนต์/ขนาดเดียวกับระบบงานอุบัติเหตุ (Kanit ตัวหนา 21px) */
+header.top .t1{font-family:'Kanit',sans-serif;font-weight:700;font-size:21px;line-height:1.3;letter-spacing:-.01em;margin:0 0 3px;color:#fff}
+header.top .t2{font-size:13px;color:#9DA0A8}
 header.top .sp{flex:1}
 header.top select{width:auto;min-width:170px;background:#fff;color:var(--ink);font-weight:600}
 header.top .who{font-size:14px;opacity:.9}
 header.top .btn{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
 header.top .btn:hover{background:rgba(255,255,255,.12)}
 header.top .btn-gold{background:var(--gold);color:#3a2a00;border-color:var(--gold)}
-nav.tabs{position:sticky;top:60px;z-index:19;background:#fff;border-bottom:1px solid var(--line);display:flex;gap:4px;padding:0 16px;overflow-x:auto}
+nav.tabs{position:sticky;top:70px;z-index:19;background:#fff;border-bottom:1px solid var(--line);display:flex;gap:4px;padding:0 16px;overflow-x:auto}
 nav.tabs button{border:0;background:none;padding:12px 14px;font-weight:600;color:var(--ink-soft);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
 nav.tabs button.on{color:var(--navy-800);border-bottom-color:var(--gold)}
 nav.tabs .badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:var(--navy-100);color:var(--navy-800);font-size:12px;margin-left:4px}
