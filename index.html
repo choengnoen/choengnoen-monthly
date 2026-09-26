@@ -55,6 +55,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 input[type=text],input[type=password],input[type=number],select,textarea{border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;width:100%}
 input:focus,select:focus,textarea:focus{outline:2px solid #9cc0ea;border-color:#6c9fd8}
 label.f{display:block;font-size:13px;color:var(--ink-soft);margin:0 0 4px;font-weight:600}
+.pw-wrap{position:relative;display:flex;flex:1}
+.pw-wrap input{flex:1;padding-right:40px}
+.pw-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;cursor:pointer;font-size:15px;color:var(--ink-soft);padding:4px 8px;line-height:1}
+.pw-toggle:hover{color:var(--ink)}
 
 /* หน้าล็อกอิน */
 #loginScreen{min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:linear-gradient(160deg,#0a2540 0%,#123a5e 55%,#1f5fbf 100%)}

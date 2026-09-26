@@ -150,6 +150,31 @@
     });
   }
 
+  /* ---------------- ปุ่มรูปตา แสดง/ซ่อนรหัสผ่าน (ใส่ให้ทุกช่องรหัสผ่านอัตโนมัติ รวมช่องที่สร้างทีหลัง) ---------------- */
+  function wrapPasswords(root) {
+    $$('input[type="password"]', root).forEach(function (inp) {
+      if (inp.parentNode.classList.contains('pw-wrap')) return;
+      const w = document.createElement('div');
+      w.className = 'pw-wrap';
+      if (inp.style.maxWidth) { w.style.maxWidth = inp.style.maxWidth; inp.style.maxWidth = ''; }
+      inp.parentNode.insertBefore(w, inp);
+      w.appendChild(inp);
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'pw-toggle'; b.title = 'แสดง/ซ่อนรหัสผ่าน'; b.textContent = '👁';
+      b.onclick = function () {
+        const show = inp.type === 'password';
+        inp.type = show ? 'text' : 'password';
+        b.textContent = show ? '🙈' : '👁';
+        inp.focus();
+      };
+      w.appendChild(b);
+    });
+  }
+  wrapPasswords(document);
+  new MutationObserver(function (list) {
+    list.forEach(function (m) { m.addedNodes.forEach(function (n) { if (n.nodeType === 1) wrapPasswords(n); }); });
+  }).observe(document.body, { childList: true, subtree: true });
+
   /* ======================================================================
      ล็อกอิน
      ====================================================================== */
