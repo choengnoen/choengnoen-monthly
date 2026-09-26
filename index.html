@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>รายงานประจำเดือน หมวดทางหลวงเชิงเนิน</title>
-<link rel="icon" href="logo.png">
+<link rel="icon" href="logo.png" data-cn-emblem>
 <!-- Firebase (Authentication + Firestore) — ชั้นเชื่อมต่ออยู่ใน firebase-layer.js -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -44,7 +44,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:600;white-space:nowrap}
 .btn:hover{background:var(--navy-100)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.btn-primary{background:var(--navy-800);border-color:var(--navy-800);color:#fff}
+.btn-primary{background:var(--navy-800);border:2px solid var(--gold);color:#fff;box-shadow:0 2px 8px rgba(10,37,64,.25)}
 .btn-primary:hover{background:var(--navy-700)}
 .btn-gold{background:var(--gold);border-color:#e0a800;color:#3a2a00}
 .btn-gold:hover{background:#ffcc4d}
@@ -168,8 +168,8 @@ ul.issues li.error{color:var(--red)} ul.issues li.warn{color:var(--amber)} ul.is
 <!-- ============ หน้าล็อกอิน ============ -->
 <section id="loginScreen">
   <div class="login-card">
-    <img src="logo.png" alt="">
-    <h1>ระบบสรุปรายงานประจำเดือน</h1>
+    <img src="logo.png" alt="ตรากรมทางหลวง">
+    <h1>รายงานประจำเดือน</h1>
     <div class="sub">หมวดทางหลวงเชิงเนิน · แขวงทางหลวงระยอง</div>
     <div id="demoNote" class="demo-note hidden"><b>โหมดทดลอง</b> — ยังไม่ได้เชื่อมต่อ Firebase ข้อมูลเก็บเฉพาะในเครื่องนี้ (ดูวิธีตั้งค่าในไฟล์คู่มือ)</div>
     <form id="loginForm">
@@ -191,7 +191,7 @@ ul.issues li.error{color:var(--red)} ul.issues li.warn{color:var(--amber)} ul.is
 <!-- ============ ระบบ ============ -->
 <div id="app" class="hidden">
   <header class="top">
-    <img src="logo.png" alt="">
+    <img src="logo.png" alt="ตรากรมทางหลวง">
     <div><div class="t1">รายงานประจำเดือน</div><div class="t2">หมวดทางหลวงเชิงเนิน</div></div>
     <div class="sp"></div>
     <select id="monthSel" title="เดือนของรายงาน"></select>
