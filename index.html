@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>รายงานประจำเดือน หมวดทางหลวงเชิงเนิน</title>
+<link rel="icon" href="logo.png">
+<!-- Firebase (Authentication + Firestore) — ชั้นเชื่อมต่ออยู่ใน firebase-layer.js -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<!-- ฐานข้อมูลกลาง CN-Hub (สายทาง/ตอนควบคุม) — อ่านไม่ได้ก็ใช้ชื่อตอนสำรองในระบบ -->
+<script src="https://choengnoen.github.io/choengnoen-hub/master-client.js"></script>
+<!-- สร้างไฟล์ PowerPoint / หาจุดสำคัญของรูป / อ่านวันที่ถ่ายจากรูป -->
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/smartcrop@2.0.5/smartcrop.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/lite.umd.js"></script>
+<script src="firebase-layer.js"></script>
+<script src="report-engine.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600&family=Prompt:ital,wght@0,400;0,600;1,600&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#182430; --ink-soft:#4d5a66; --ink-mute:#8792a0;
+  --paper:#f3f5f8; --card:#ffffff; --line:#dde2e8;
+  --navy-900:#0a2540; --navy-800:#123a5e; --navy-700:#1c4b73; --navy-100:#e6eef6;
+  --blue:#1f5fbf; --gold:#FAC02E; --gold-bg:#fff6dc;
+  --green:#1c8a53; --green-bg:#e5f4ec;
+  --amber:#b8650a; --amber-bg:#fdf1de;
+  --red:#c1402f; --red-bg:#fbeae7;
+  --radius:12px; --shadow:0 1px 3px rgba(10,37,64,.08),0 4px 14px rgba(10,37,64,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Sarabun',system-ui,sans-serif;font-size:15px;color:var(--ink);background:var(--paper);line-height:1.5}
+h1,h2,h3{font-family:'Kanit',sans-serif;font-weight:600;margin:0;line-height:1.3}
+h2{font-size:20px} h3{font-size:17px}
+button,input,select,textarea{font:inherit;color:inherit}
+.hidden{display:none!important}
+.muted{color:var(--ink-mute)} .small{font-size:13px}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ปุ่ม */
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 14px;cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:hover{background:var(--navy-100)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--navy-800);border-color:var(--navy-800);color:#fff}
+.btn-primary:hover{background:var(--navy-700)}
+.btn-gold{background:var(--gold);border-color:#e0a800;color:#3a2a00}
+.btn-gold:hover{background:#ffcc4d}
+.btn-danger{color:var(--red);border-color:#efc4bd}
+.btn-danger:hover{background:var(--red-bg)}
+.btn-sm{padding:4px 10px;font-size:13px;border-radius:7px}
+.btn-icon{padding:4px 8px;font-size:13px;border-radius:7px}
+input[type=text],input[type=password],input[type=number],select,textarea{border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid #9cc0ea;border-color:#6c9fd8}
+label.f{display:block;font-size:13px;color:var(--ink-soft);margin:0 0 4px;font-weight:600}
+
+/* หน้าล็อกอิน */
+#loginScreen{min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:linear-gradient(160deg,#0a2540 0%,#123a5e 55%,#1f5fbf 100%)}
+.login-card{width:100%;max-width:420px;background:#fff;border-radius:18px;padding:30px 28px;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center}
+.login-card img{width:84px;height:84px}
+.login-card h1{font-size:22px;margin:10px 0 2px;color:var(--navy-900)}
+.login-card .sub{color:var(--ink-soft);margin-bottom:20px}
+.login-card form{text-align:left;display:grid;gap:12px}
+.err{color:var(--red);font-size:14px;min-height:20px}
+.demo-note{background:var(--amber-bg);color:#7a4300;border-radius:10px;padding:10px 12px;font-size:13px;text-align:left;margin-bottom:14px}
+
+/* โครงหน้า */
+header.top{position:sticky;top:0;z-index:20;background:var(--navy-900);color:#fff;display:flex;align-items:center;gap:14px;padding:10px 20px;flex-wrap:wrap}
+header.top img{width:40px;height:40px}
+header.top .t1{font-family:'Kanit';font-size:18px;line-height:1.2}
+header.top .t2{font-size:13px;opacity:.75}
+header.top .sp{flex:1}
+header.top select{width:auto;min-width:170px;background:#fff;color:var(--ink);font-weight:600}
+header.top .who{font-size:14px;opacity:.9}
+header.top .btn{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+header.top .btn:hover{background:rgba(255,255,255,.12)}
+header.top .btn-gold{background:var(--gold);color:#3a2a00;border-color:var(--gold)}
+nav.tabs{position:sticky;top:60px;z-index:19;background:#fff;border-bottom:1px solid var(--line);display:flex;gap:4px;padding:0 16px;overflow-x:auto}
+nav.tabs button{border:0;background:none;padding:12px 14px;font-weight:600;color:var(--ink-soft);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+nav.tabs button.on{color:var(--navy-800);border-bottom-color:var(--gold)}
+nav.tabs .badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:var(--navy-100);color:var(--navy-800);font-size:12px;margin-left:4px}
+nav.tabs .badge.warn{background:var(--amber-bg);color:var(--amber)}
+main{max-width:1500px;margin:0 auto;padding:20px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:18px}
+.card-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.card-head .sp{flex:1}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.empty{padding:40px 20px;text-align:center;color:var(--ink-soft)}
+.empty h2{margin-bottom:8px}
+
+/* ตาราง */
+.tbl-wrap{overflow-x:auto}
+table.tbl{width:100%;border-collapse:collapse;font-size:14px}
+table.tbl th{background:var(--navy-100);color:var(--navy-900);text-align:left;padding:8px 10px;font-weight:700;white-space:nowrap}
+table.tbl td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.tbl tr.tot td{font-weight:700;background:#f7f9fb}
+table.tbl tr.bad td{background:#fff7f5}
+.pill{display:inline-block;padding:1px 9px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
+.pill.ok{background:var(--green-bg);color:var(--green)}
+.pill.warn{background:var(--amber-bg);color:var(--amber)}
+.pill.err{background:var(--red-bg);color:var(--red)}
+.pill.info{background:var(--navy-100);color:var(--navy-700)}
+ul.issues{margin:6px 0 0;padding-left:18px;font-size:13px}
+ul.issues li.error{color:var(--red)} ul.issues li.warn{color:var(--amber)} ul.issues li.info{color:var(--ink-soft)}
+
+/* ที่วางไฟล์ */
+.drop{border:2px dashed #b9c6d4;border-radius:12px;padding:22px;text-align:center;color:var(--ink-soft);background:#fafcfe;cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--blue);background:#eef5ff;color:var(--navy-800)}
+.drop b{color:var(--navy-800)}
+.drop.small{padding:10px;font-size:13px}
+
+/* ตัวอย่างสไลด์ */
+.slide{position:relative;width:100%;aspect-ratio:20/11.25;background:#dfe7f1;overflow:hidden;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,.15);font-family:'Prompt',sans-serif;container-type:inline-size}
+.slide>*{position:absolute}
+.slide .el-text{display:flex;white-space:pre-wrap;overflow:hidden;line-height:1.25}
+.slide .el-photo{background-repeat:no-repeat;background-color:#cfd8e3}
+.slide .el-ph{border:2px dashed #9fb3c8;display:grid;place-items:center;color:#6d8199;background:rgba(255,255,255,.55);font-family:'Sarabun'}
+.slide .el-chart{background:#fff}
+.slide .el-photo.sel{outline:3px solid var(--gold);z-index:3}
+
+/* งานรายรหัส */
+.work{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}
+.thumbs{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.thumb{width:132px;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff;font-size:12px}
+.thumb .im{height:90px;background-size:cover;background-position:center;position:relative;cursor:crosshair}
+.thumb .im .fp{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 2px var(--gold)}
+.thumb .no{position:absolute;left:4px;top:4px;background:rgba(10,37,64,.8);color:#fff;border-radius:6px;padding:0 6px;font-weight:700}
+.thumb .bar{display:flex;gap:2px;padding:4px;justify-content:space-between;align-items:center}
+.thumb .bar .muted{font-size:11px;white-space:nowrap}
+.thumb .flags{padding:0 5px 4px;color:var(--amber);font-weight:600;min-height:4px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:14px}
+.kv div:nth-child(odd){color:var(--ink-soft)}
+.kv div:nth-child(even){text-align:right;font-variant-numeric:tabular-nums}
+
+/* ปัญหา */
+.prob{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;background:#fcfdfe}
+.pt{border-top:1px dashed var(--line);padding-top:12px;margin-top:12px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.fgrid .w2{grid-column:span 2}
+
+/* หน้าต่าง / แจ้งเตือน */
+.modal-bg{position:fixed;inset:0;background:rgba(10,20,35,.55);display:grid;place-items:center;z-index:100;padding:16px}
+.modal{background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.modal.wide{max-width:900px}
+.modal-h{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center}
+.modal-h h3{flex:1}
+.modal-b{padding:18px 20px}
+.modal-f{padding:12px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;display:grid;gap:8px;width:max-content;max-width:calc(100% - 32px)}
+.toast{background:var(--navy-900);color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.toast.err{background:var(--red)} .toast.ok{background:var(--green)}
+.progress{height:8px;background:var(--navy-100);border-radius:6px;overflow:hidden}
+.progress>div{height:100%;background:var(--blue);transition:width .2s}
+.check li{margin:4px 0}
+@media (max-width:1000px){.work,.grid2{grid-template-columns:1fr}}
+@media (max-width:640px){main{padding:12px}.card{padding:14px}header.top{padding:10px 12px}nav.tabs{top:auto;position:static}}
+</style>
+</head>
+<body>
+
+<!-- ============ หน้าล็อกอิน ============ -->
+<section id="loginScreen">
+  <div class="login-card">
+    <img src="logo.png" alt="">
+    <h1>ระบบสรุปรายงานประจำเดือน</h1>
+    <div class="sub">หมวดทางหลวงเชิงเนิน · แขวงทางหลวงระยอง</div>
+    <div id="demoNote" class="demo-note hidden"><b>โหมดทดลอง</b> — ยังไม่ได้เชื่อมต่อ Firebase ข้อมูลเก็บเฉพาะในเครื่องนี้ (ดูวิธีตั้งค่าในไฟล์คู่มือ)</div>
+    <form id="loginForm">
+      <div><label class="f" for="loginName">ชื่อเจ้าหน้าที่</label><select id="loginName"></select></div>
+      <div id="loginPwWrap"><label class="f" for="loginPw">รหัสผ่าน</label><input type="password" id="loginPw" autocomplete="current-password"></div>
+      <div class="err" id="loginErr"></div>
+      <button class="btn btn-primary" type="submit" id="loginBtn" style="justify-content:center">เข้าสู่ระบบ</button>
+    </form>
+    <form id="bootForm" class="hidden">
+      <div class="demo-note">ตั้งค่าเจ้าของระบบครั้งแรก — ทำได้ครั้งเดียว ผู้ตั้งค่าจะเป็นเจ้าของระบบ</div>
+      <div><label class="f" for="bootName">ชื่อ-นามสกุล</label><input type="text" id="bootName"></div>
+      <div><label class="f" for="bootPw">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label><input type="password" id="bootPw" autocomplete="new-password"></div>
+      <div class="err" id="bootErr"></div>
+      <button class="btn btn-primary" type="submit" style="justify-content:center">ตั้งเป็นเจ้าของระบบ</button>
+    </form>
+  </div>
+</section>
+
+<!-- ============ ระบบ ============ -->
+<div id="app" class="hidden">
+  <header class="top">
+    <img src="logo.png" alt="">
+    <div><div class="t1">รายงานประจำเดือน</div><div class="t2">หมวดทางหลวงเชิงเนิน</div></div>
+    <div class="sp"></div>
+    <select id="monthSel" title="เดือนของรายงาน"></select>
+    <button class="btn btn-gold btn-sm" id="newMonthBtn">+ เริ่มเดือนใหม่</button>
+    <span class="who" id="whoName"></span>
+    <button class="btn btn-sm" id="logoutBtn">ออกจากระบบ</button>
+  </header>
+  <nav class="tabs" id="tabs">
+    <button data-tab="import" class="on">① นำเข้าข้อมูล <span class="badge" id="bImport">0</span></button>
+    <button data-tab="work">② รายรหัสงาน &amp; รูป <span class="badge" id="bWork">0</span></button>
+    <button data-tab="cover">③ ปก &amp; ปัญหาอุปสรรค</button>
+    <button data-tab="plan">④ แผน-ผล</button>
+    <button data-tab="export">⑤ ส่งออก PowerPoint</button>
+    <button data-tab="settings">ตั้งค่า</button>
+  </nav>
+  <main>
+    <div id="noReport" class="card empty hidden">
+      <h2>ยังไม่มีรายงานเดือนใดในระบบ</h2>
+      <p>เริ่มต้นด้วยการสร้างรายงานของเดือนที่ต้องการ</p>
+      <button class="btn btn-primary" id="firstMonthBtn">+ เริ่มรายงานเดือนแรก</button>
+    </div>
+    <section data-panel="import"></section>
+    <section data-panel="work" class="hidden"></section>
+    <section data-panel="cover" class="hidden"></section>
+    <section data-panel="plan" class="hidden"></section>
+    <section data-panel="export" class="hidden"></section>
+    <section data-panel="settings" class="hidden"></section>
+  </main>
+</div>
+
+<div id="toast"></div>
+<input type="file" id="filePick" class="hidden">
+<script src="app.js"></script>
+</body>
+</html>
