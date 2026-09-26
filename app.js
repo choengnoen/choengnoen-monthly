@@ -182,16 +182,18 @@
     if (FBL.demo) { $('#demoNote').classList.remove('hidden'); $('#loginPwWrap').classList.add('hidden'); }
     try {
       const team = await FBL.loadTeam();
-      $('#loginName').innerHTML = team.map(function (t) { return '<option>' + esc(t.name) + '</option>'; }).join('');
+      // เหมือนระบบงานอุบัติเหตุ: ขึ้น "— เลือกชื่อของคุณ —" ไว้ก่อน ไม่เลือกชื่อใครไว้ให้ล่วงหน้า
+      $('#loginName').innerHTML = '<option value="">— เลือกชื่อของคุณ —</option>' +
+        team.map(function (t) { return '<option value="' + esc(t.name) + '">' + esc(t.name) + '</option>'; }).join('');
       if (!FBL.demo && await FBL.needsBootstrap()) { $('#loginForm').classList.add('hidden'); $('#bootForm').classList.remove('hidden'); }
-      const last = lsGet('cn-monthly-lastUser');
-      if (last && team.some(function (t) { return t.name === last; })) $('#loginName').value = last;
     } catch (e) { $('#loginErr').textContent = FBL.errorText(e); }
     $('#loginForm').onsubmit = async function (ev) {
       ev.preventDefault();
       $('#loginErr').textContent = '';
+      if (!$('#loginName').value) { $('#loginErr').textContent = 'เลือกชื่อของคุณก่อน'; return; }
+      if (!FBL.demo && !$('#loginPw').value) { $('#loginErr').textContent = 'กรอกรหัสผ่าน'; return; }
       $('#loginBtn').disabled = true;
-      try { lsSet('cn-monthly-lastUser', $('#loginName').value); await FBL.login($('#loginName').value, $('#loginPw').value); }
+      try { await FBL.login($('#loginName').value, $('#loginPw').value); }
       catch (e) { $('#loginErr').textContent = e.message; }
       finally { $('#loginBtn').disabled = false; }
     };
@@ -218,7 +220,9 @@
     started = true;
     $('#loginScreen').classList.add('hidden');
     $('#app').classList.remove('hidden');
-    $('#whoName').textContent = FBL.user.name + (FBL.user.isOwner ? ' (เจ้าของระบบ)' : FBL.user.isAdmin ? ' (ผู้ดูแลระบบ)' : '');
+    // แบบเดียวกับระบบควบคุมงานโครงการ: ผู้บันทึก: ชื่อ 👑 (เจ้าของระบบ) / 🛡️ (ผู้ดูแลระบบ)
+    $('#whoName').textContent = 'ผู้บันทึก: ' + FBL.user.name + (FBL.user.isOwner ? ' 👑' : FBL.user.isAdmin ? ' 🛡️' : '');
+    $('#whoName').title = FBL.user.isOwner ? 'เจ้าของระบบ' : (FBL.user.isAdmin ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน');
     const onChange = function (col, docs) { S[col] = docs; if (col === 'photos') S.photos.forEach(function (p) { p.id = p.__id; }); scheduleRender(col); };
     const got = await Promise.all(['reports', 'records', 'photos', 'plans'].map(function (c) { return FBL.watch(c, onChange); }));
     S.reports = got[0]; S.records = got[1]; S.photos = got[2]; S.plans = got[3];
