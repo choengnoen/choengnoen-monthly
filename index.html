@@ -90,7 +90,7 @@ html:has(#loginScreen:not(.hidden)){overflow-y:scroll}
 /* โครงหน้า */
 /* หัวเว็บ — รูปแบบเดียวกับระบบงานอุบัติเหตุ / ระบบควบคุมงานโครงการ */
 header.top{background:radial-gradient(1100px 420px at 12% -20%, var(--navy-800) 0%, #071b30 55%);color:#fff;padding:20px 22px 0;border-bottom:1px solid rgba(0,0,0,.35)}
-header.top .top-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;max-width:1500px;margin:0 auto}
+header.top .top-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;max-width:1180px;margin:0 auto}
 header.top img{width:40px;height:40px;flex:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
 header.top .t1{font-family:'Kanit',sans-serif;font-weight:700;font-size:21px;line-height:1.3;letter-spacing:-.01em;margin:0 0 3px;color:#fff}
 header.top .t2{font-size:13px;color:#9DA0A8}
@@ -102,10 +102,10 @@ header.top .btn-gold:hover{background:#ffcc4d;color:#3a2a00}
 /* ปุ่มออกจากระบบ: ไม่มีขอบ แบบ btn-ghost ของระบบงานอุบัติเหตุ */
 header.top #logoutBtn{background:transparent;border:none;color:#9DA0A8}
 header.top #logoutBtn:hover{color:#fff;background:transparent}
-header.top .month-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:1500px;margin:12px auto 0}
+header.top .month-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:1180px;margin:12px auto 0}
 header.top select{width:auto;min-width:220px;max-width:100%;font-family:'Kanit',sans-serif;font-weight:500;font-size:14px;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.22);border-radius:9px;padding:6px 10px}
 header.top select option{color:var(--ink)}
-header.top .tabs-row{display:flex;align-items:center;gap:10px;max-width:1500px;margin:12px auto 0;border-top:1px solid rgba(255,255,255,.08)}
+header.top .tabs-row{display:flex;align-items:center;gap:10px;max-width:1180px;margin:12px auto 0;border-top:1px solid rgba(255,255,255,.08)}
 header.top .header-actions{flex:none;display:flex;gap:8px;align-items:center}
 nav.tabs{flex:1;min-width:0;display:flex;gap:0;overflow-x:auto}
 nav.tabs button{font-family:'Kanit',sans-serif;font-weight:600;font-size:12.5px;border:0;background:none;padding:9px 13px;color:#84878F;border-bottom:2px solid transparent;letter-spacing:.01em;cursor:pointer;white-space:nowrap;transition:color .15s}
@@ -114,7 +114,8 @@ nav.tabs button.on{color:#fff;border-bottom-color:var(--gold)}
 nav.tabs .badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:rgba(255,255,255,.12);color:#DEDFE2;font-size:11px;margin-left:4px}
 @media (max-width:900px){header.top .tabs-row{flex-direction:column-reverse;align-items:stretch}header.top .header-actions{justify-content:flex-end;padding:8px 0 2px}}
 nav.tabs .badge.warn{background:var(--amber-bg);color:var(--amber)}
-main{max-width:1500px;margin:0 auto;padding:20px}
+/* ความกว้างเท่าระบบงานอุบัติเหตุ (.shell 1180px ขอบซ้ายขวา 18px) */
+main{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
 .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:18px}
 .card-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 .card-head .sp{flex:1}
