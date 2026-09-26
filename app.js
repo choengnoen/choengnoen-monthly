@@ -346,7 +346,7 @@
     const p = $('[data-panel="import"]');
     const recs = monthRecords().sort(function (a, b) { return a.code.localeCompare(b.code) || String(a.dates[0]).localeCompare(String(b.dates[0])); });
     let h = '<div class="card"><div class="card-head"><h2>นำเข้าไฟล์ผลการปฏิบัติงาน · เดือน ' + esc(RE.mkLabel(S.mk)) + '</h2></div>' +
-      '<div class="drop" id="csvDrop"><b>ลากไฟล์ Export_CSV ทั้งหมดของเดือนมาวางที่นี่</b><br>หรือคลิกเพื่อเลือกไฟล์ (เลือกหลายไฟล์พร้อมกันได้) — ระบบจะตรวจความถูกต้องทุกไฟล์ก่อนบันทึก</div>';
+      '<div class="drop" id="csvDrop"><b>เลือกไฟล์ Export_CSV ทั้งหมดของเดือนมาวางที่นี่</b></div>';
     if (S.pending) h += pendingHtml();
     h += '</div>';
 
@@ -400,13 +400,14 @@
     let h = '<div style="margin-top:16px"><div class="row" style="margin-bottom:10px"><h3>ผลการตรวจสอบ ' + rows.length + ' ไฟล์</h3>' +
       '<span class="pill ok">ผ่าน ' + rows.filter(function (r) { return r.level === 'ok' || r.level === 'info'; }).length + '</span>' +
       (nWarn ? '<span class="pill warn">ต้องตัดสินใจ ' + nWarn + '</span>' : '') + (nErr ? '<span class="pill err">ผิดพลาด (ไม่บันทึก) ' + nErr + '</span>' : '') + '</div>' +
-      '<div class="tbl-wrap"><table class="tbl pend"><tr><th>สถานะ</th><th>ไฟล์ / ผลตรวจ</th><th>รหัสงาน</th><th>สายทาง / กม.</th><th>วันที่</th><th class="num">ปริมาณ</th><th class="num">รวม (บาท)</th><th class="c">ใช้ข้อมูล</th></tr>';
+      '<div class="tbl-wrap"><table class="tbl pend">' +
+      '<colgroup><col style="width:92px"><col style="width:26%"><col style="width:24%"><col style="width:15%"><col style="width:14%"><col style="width:80px"><col style="width:100px"><col style="width:92px"></colgroup><tr><th>สถานะ</th><th>ไฟล์ / ผลตรวจ</th><th>รหัสงาน</th><th>สายทาง / กม.</th><th>วันที่</th><th class="num">ปริมาณ</th><th class="num">รวม (บาท)</th><th class="c">ใช้ข้อมูล</th></tr>';
     rows.forEach(function (x, i) {
       const r = x.rec;
       const pill = x.level === 'error' ? '<span class="pill err">ผิดพลาด</span>' : x.level === 'warn' ? '<span class="pill warn">ตรวจสอบ</span>' : '<span class="pill ok">ผ่าน</span>';
       h += '<tr class="' + (x.level === 'error' ? 'bad' : x.confirmed === false ? 'skip' : '') + '"><td>' + pill + '</td><td class="small">' + esc(x.file) +
         (x.issues.length ? '<ul class="issues">' + x.issues.map(function (s) { return '<li class="' + s.level + '">' + esc(s.msg) + '</li>'; }).join('') + '</ul>' : '') + '</td>' +
-        (r ? '<td><b>' + r.code + '</b><div class="nm" title="' + esc(r.name) + '">' + esc(r.name) + '</div></td><td class="nw">ทล.' + esc(r.route) + '<br><span class="small muted">กม. ' + esc(r.kmFrom) + ' – ' + esc(r.kmTo) + '</span></td><td class="small dt">' + compactDates(r.dates) + '</td><td class="num">' + RE.fmtQty(r.qty) + '</td><td class="num">' + RE.fmt(r.total) + '</td>'
+        (r ? '<td><b>' + r.code + '</b><div class="nm" title="' + esc(r.name) + '">' + esc(r.name) + '</div></td><td>ทล.' + esc(r.route) + '<br><span class="small muted"><span class="km">กม. ' + esc(r.kmFrom) + '</span> <span class="km">– ' + esc(r.kmTo) + '</span></span></td><td class="small dt">' + compactDates(r.dates) + '</td><td class="num">' + RE.fmtQty(r.qty) + '</td><td class="num">' + RE.fmt(r.total) + '</td>'
           : '<td colspan="5"></td>') +
         '<td class="c">' + (x.level === 'warn'
           ? '<div class="dec"><button type="button" class="yes' + (x.confirmed === true ? ' on' : '') + '" data-dec="' + i + '" data-v="1" title="ใช้ข้อมูล (ตรวจแล้ว ถูกต้อง)">✓</button>' +
