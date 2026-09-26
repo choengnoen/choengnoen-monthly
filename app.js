@@ -52,7 +52,17 @@
     return S.photos.filter(function (p) { return p.mk === S.mk && p.slot === slot; })
       .sort(function (a, b) { return (a.order - b.order) || String(a.takenAt).localeCompare(String(b.takenAt)); });
   }
-  function unitOf(code) { const u = (rep().units || {})[code]; return u || RE.DEFAULT_UNITS[code] || 'หน่วย'; }
+  // หน่วยนับที่ใช้ได้ของรหัสงาน จากฐานข้อมูลกลาง CN-Hub (1 รหัสงานอาจมีหลายหน่วย) — อ่านไม่ได้/ไม่มีรหัสนี้ คืน []
+  function unitChoices(code) {
+    try { if (window.CNMaster && CNMaster.unitsOf) return CNMaster.unitsOf(code); } catch (e) { /* ใช้ค่าสำรอง */ }
+    return [];
+  }
+  // หน่วยที่เลือกไว้ในรายงานเดือนนี้ (ต้องเป็นหน่วยในฐานข้อมูลกลาง) ไม่ได้เลือก = หน่วยหลักของรหัสงาน
+  function unitOf(code) {
+    const picked = (rep().units || {})[code], ch = unitChoices(code);
+    if (picked && (!ch.length || ch.indexOf(picked) >= 0)) return picked;
+    return ch[0] || RE.DEFAULT_UNITS[code] || 'หน่วย';
+  }
   function planOf(fy) { return S.plans.find(function (p) { return p.__id === String(fy); }) || null; }
   function validChoice(c, n) { return n > 0 && c != null && c !== '' && Number(c) < RE.templates(n).length ? Number(c) : null; }
   function photoSpec(p) { return { id: p.id || p.__id, w: p.w, h: p.h, fx: p.fx, fy: p.fy }; }
@@ -232,7 +242,7 @@
     S.mk = ids.indexOf(last) >= 0 ? last : (ids[ids.length - 1] || '');
     if (window.CNMaster && CNMaster.ready) {
       CNMaster.ready.then(function () { renderAll(); }).catch(function () {});
-      CNMaster.onChange(function (w) { if (w === 'routes') renderAll(); });
+      CNMaster.onChange(function (w) { if (w === 'routes' || w === 'workcodes') renderAll(); });
     }
     renderAll();
   }
@@ -297,14 +307,13 @@
     const html = '<div class="grid2"><div><label class="f">เดือน</label><select id="nmM">' +
       RE.MONTHS.map(function (n, i) { return '<option value="' + (i + 1) + '"' + (i + 1 === m ? ' selected' : '') + '>' + n + '</option>'; }).join('') +
       '</select></div><div><label class="f">ปี (พ.ศ.)</label><select id="nmY">' + years.map(function (yy) { return '<option' + (yy === y ? ' selected' : '') + '>' + yy + '</option>'; }).join('') + '</select></div></div>' +
-      '<p class="small muted">หน่วยนับของแต่ละรหัสงานจะคัดลอกจากเดือนล่าสุดให้อัตโนมัติ</p>';
+      '<p class="small muted">หน่วยนับของแต่ละรหัสงานอ้างอิงจากฐานข้อมูลกลาง (รหัสงาน) — รหัสงานที่มีหลายหน่วย เลือกหน่วยของเดือนนี้ได้ที่แท็บรายรหัสงาน</p>';
     const r = await modal({ title: 'เริ่มรายงานเดือนใหม่', html: html, ok: 'สร้างรายงาน', read: function (bg) { return $('#nmY', bg).value + '-' + String($('#nmM', bg).value).padStart(2, '0'); } });
     if (!r) return;
     const mk = r;
     if (S.reports.some(function (x) { return x.__id === mk; })) { S.mk = mk; lsSet('cn-monthly-mk', mk); renderAll(); toast('มีรายงานเดือนนี้อยู่แล้ว — เปิดให้แล้ว'); return; }
-    const prev = S.reports.slice().sort(function (a, b) { return a.__id < b.__id ? 1 : -1; })[0] || {};
     await run(async function () {
-      await FBL.set('reports', mk, { mk: mk, units: prev.units || {}, meetingText: '', problems: [], layouts: {}, exclude: {}, createdAt: FBL.nowIso(), createdBy: FBL.user.name, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name });
+      await FBL.set('reports', mk, { mk: mk, units: {}, meetingText: '', problems: [], layouts: {}, exclude: {}, createdAt: FBL.nowIso(), createdBy: FBL.user.name, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name });
       S.mk = mk; lsSet('cn-monthly-mk', mk); S.tab = 'import';
     }, 'สร้างรายงานเดือน ' + RE.mkLabel(mk) + ' แล้ว');
     renderAll();
@@ -386,28 +395,58 @@
     const rows = S.pending;
     const nErr = rows.filter(function (r) { return r.level === 'error'; }).length;
     const nWarn = rows.filter(function (r) { return r.level === 'warn'; }).length;
+    const nUndec = rows.filter(function (r) { return r.level === 'warn' && r.confirmed == null; }).length;
     const ok = rows.filter(canSave).length;
     let h = '<div style="margin-top:16px"><div class="row" style="margin-bottom:10px"><h3>ผลการตรวจสอบ ' + rows.length + ' ไฟล์</h3>' +
       '<span class="pill ok">ผ่าน ' + rows.filter(function (r) { return r.level === 'ok' || r.level === 'info'; }).length + '</span>' +
-      (nWarn ? '<span class="pill warn">ต้องยืนยัน ' + nWarn + '</span>' : '') + (nErr ? '<span class="pill err">ผิดพลาด (ไม่บันทึก) ' + nErr + '</span>' : '') + '</div>' +
-      '<div class="tbl-wrap"><table class="tbl"><tr><th>สถานะ</th><th>ไฟล์</th><th>รหัสงาน</th><th>สายทาง / กม.</th><th>วันที่</th><th class="num">ปริมาณ</th><th class="num">รวม (บาท)</th><th>ยืนยัน</th></tr>';
+      (nWarn ? '<span class="pill warn">ต้องตัดสินใจ ' + nWarn + '</span>' : '') + (nErr ? '<span class="pill err">ผิดพลาด (ไม่บันทึก) ' + nErr + '</span>' : '') + '</div>' +
+      '<div class="tbl-wrap"><table class="tbl pend"><tr><th>สถานะ</th><th>ไฟล์ / ผลตรวจ</th><th>รหัสงาน</th><th>สายทาง / กม.</th><th>วันที่</th><th class="num">ปริมาณ</th><th class="num">รวม (บาท)</th><th class="c">ใช้ข้อมูล</th></tr>';
     rows.forEach(function (x, i) {
       const r = x.rec;
       const pill = x.level === 'error' ? '<span class="pill err">ผิดพลาด</span>' : x.level === 'warn' ? '<span class="pill warn">ตรวจสอบ</span>' : '<span class="pill ok">ผ่าน</span>';
-      h += '<tr class="' + (x.level === 'error' ? 'bad' : '') + '"><td>' + pill + '</td><td class="small">' + esc(x.file) +
+      h += '<tr class="' + (x.level === 'error' ? 'bad' : x.confirmed === false ? 'skip' : '') + '"><td>' + pill + '</td><td class="small">' + esc(x.file) +
         (x.issues.length ? '<ul class="issues">' + x.issues.map(function (s) { return '<li class="' + s.level + '">' + esc(s.msg) + '</li>'; }).join('') + '</ul>' : '') + '</td>' +
-        (r ? '<td><b>' + r.code + '</b> ' + esc(r.name.length > 26 ? r.name.slice(0, 26) + '…' : r.name) + '</td><td>ทล.' + esc(r.route) + '<br><span class="small muted">กม. ' + esc(r.kmFrom) + ' – ' + esc(r.kmTo) + '</span></td><td class="small">' + r.dates.map(RE.thDate).join(', ') + '</td><td class="num">' + RE.fmtQty(r.qty) + '</td><td class="num">' + RE.fmt(r.total) + '</td>'
+        (r ? '<td><b>' + r.code + '</b><div class="nm" title="' + esc(r.name) + '">' + esc(r.name) + '</div></td><td class="nw">ทล.' + esc(r.route) + '<br><span class="small muted">กม. ' + esc(r.kmFrom) + ' – ' + esc(r.kmTo) + '</span></td><td class="small dt">' + compactDates(r.dates) + '</td><td class="num">' + RE.fmtQty(r.qty) + '</td><td class="num">' + RE.fmt(r.total) + '</td>'
           : '<td colspan="5"></td>') +
-        '<td>' + (x.level === 'warn' ? '<label class="small"><input type="checkbox" data-conf="' + i + '"' + (x.confirmed ? ' checked' : '') + '> ตรวจแล้ว ถูกต้อง</label>' : x.level === 'error' ? '<span class="small muted">ข้าม</span>' : '✓') + '</td></tr>';
+        '<td class="c">' + (x.level === 'warn'
+          ? '<div class="dec"><button type="button" class="yes' + (x.confirmed === true ? ' on' : '') + '" data-dec="' + i + '" data-v="1" title="ใช้ข้อมูล (ตรวจแล้ว ถูกต้อง)">✓</button>' +
+            '<button type="button" class="no' + (x.confirmed === false ? ' on' : '') + '" data-dec="' + i + '" data-v="0" title="ไม่ใช้ข้อมูล (ไม่บันทึกไฟล์นี้)">✕</button></div>'
+          : x.level === 'error' ? '<span class="small muted">ข้าม</span>' : '<span class="ok-mark">✓</span>') + '</td></tr>';
     });
-    h += '</table></div><div class="row" style="margin-top:12px;justify-content:flex-end">' +
-      '<button class="btn" id="pendCancel">ยกเลิก</button><button class="btn btn-primary" id="pendSave"' + (ok ? '' : ' disabled') + '>บันทึก ' + ok + ' รายการ</button></div>' +
+    h += '</table></div><div class="row" style="margin-top:12px;justify-content:flex-end;align-items:center">' +
+      (nUndec ? '<span class="small" style="color:var(--amber)">ยังไม่ได้ตัดสินใจ ' + nUndec + ' ไฟล์ — กด ✓ ใช้ข้อมูล หรือ ✕ ไม่ใช้ข้อมูล</span>' : '') +
+      '<button class="btn" id="pendCancel">ยกเลิก</button><button class="btn btn-primary" id="pendSave"' + (ok && !nUndec ? '' : ' disabled') + '>บันทึก ' + ok + ' รายการ</button></div>' +
       (nErr ? '<p class="small muted" style="text-align:right">ไฟล์ที่ผิดพลาดจะไม่ถูกบันทึก ให้เจ้าหน้าที่แก้ในระบบของแขวงแล้วส่งออกไฟล์ใหม่</p>' : '') + '</div>';
     return h;
   }
-  function canSave(x) { return x.level === 'ok' || x.level === 'info' || (x.level === 'warn' && x.confirmed); }
+  function canSave(x) { return x.level === 'ok' || x.level === 'info' || (x.level === 'warn' && x.confirmed === true); }
+  // ย่อรายการวันที่: วันติดกันรวมเป็นช่วง ชื่อเดือนแสดงครั้งเดียว เช่น "1, 3–8, 10–15 ส.ค. (14 วัน)"
+  function compactDates(dates) {
+    const ds = dates.slice().sort();
+    const parts = [];
+    let i = 0;
+    while (i < ds.length) {
+      const ym = ds[i].slice(0, 7), grp = [];
+      while (i < ds.length && ds[i].slice(0, 7) === ym) grp.push(Number(ds[i++].slice(8, 10)));
+      const rs = [];
+      for (let j = 0; j < grp.length; j++) {
+        let k = j;
+        while (k + 1 < grp.length && grp[k + 1] === grp[k] + 1) k++;
+        rs.push(k > j ? grp[j] + '–' + grp[k] : String(grp[j]));
+        j = k;
+      }
+      parts.push(rs.join(', ') + ' ' + RE.MONTHS_SHORT[Number(ym.slice(5, 7)) - 1]);
+    }
+    return esc(parts.join(' · ')) + (ds.length > 1 ? ' <span class="muted">(' + ds.length + ' วัน)</span>' : '');
+  }
   function bindPending(p) {
-    $$('[data-conf]', p).forEach(function (c) { c.onchange = function () { S.pending[Number(c.getAttribute('data-conf'))].confirmed = c.checked; renderImport(); }; });
+    $$('[data-dec]', p).forEach(function (b) {
+      b.onclick = function () {
+        const x = S.pending[Number(b.getAttribute('data-dec'))], v = b.getAttribute('data-v') === '1';
+        x.confirmed = x.confirmed === v ? null : v; // กดซ้ำ = ยกเลิกการเลือก
+        renderImport();
+      };
+    });
     $('#pendCancel').onclick = function () { S.pending = null; renderImport(); };
     $('#pendSave').onclick = function () {
       const rows = S.pending.filter(canSave);
@@ -561,6 +600,23 @@
     const ph = photosOf(slot).map(photoSpec);
     return RE.slideWork(a, unitOf(a.code), ph, validChoice((rep().layouts || {})[slot], ph.length));
   }
+  // ช่องหน่วยนับ: มีหลายหน่วยในฐานข้อมูลกลาง = เลือกจากรายการ · หน่วยเดียว = แสดงอย่างเดียว
+  // อ่านฐานข้อมูลกลางไม่ได้ / ไม่มีรหัสนี้ = พิมพ์เองได้ (สำรอง)
+  function unitFieldHtml(code) {
+    const ch = unitChoices(code), cur = unitOf(code);
+    if (ch.length > 1) return '<select data-unit="' + code + '">' + ch.map(function (u) { return '<option' + (u === cur ? ' selected' : '') + '>' + esc(u) + '</option>'; }).join('') + '</select>';
+    if (ch.length === 1) return '<input type="text" value="' + esc(cur) + '" readonly title="หน่วยนับจากฐานข้อมูลกลาง (รหัสงานนี้มีหน่วยเดียว)">';
+    return '<input type="text" list="unitList" data-unit="' + code + '" value="' + esc(cur) + '">';
+  }
+  function unitNoteHtml(code) {
+    const ch = unitChoices(code);
+    const link = window.CNMaster && CNMaster.editUrl ? ' <a href="' + esc(CNMaster.editUrl('workcodes')) + '" target="_blank" rel="noopener">แก้ไขที่ฐานข้อมูลกลาง</a>' : '';
+    if (ch.length > 1) return '<p class="small muted" style="margin:4px 0 0">รหัสงานนี้มี ' + ch.length + ' หน่วย (' + ch.map(esc).join(' / ') + ') เลือกหน่วยที่ตรงกับปริมาณงานของเดือนนี้' + link + '</p>';
+    if (ch.length === 1) return '';
+    let hubReady = false;
+    try { hubReady = !!(window.CNMaster && CNMaster.workCodes && CNMaster.workCodes().length); } catch (e) { /* ข้าม */ }
+    return '<p class="small" style="margin:4px 0 0;color:#b45309">' + (hubReady ? 'ไม่พบรหัสงาน ' + code + ' (หรือยังไม่ได้กำหนดหน่วยนับ) ในฐานข้อมูลกลาง — พิมพ์หน่วยเองชั่วคราว' : 'ยังเชื่อมต่อฐานข้อมูลกลางไม่ได้ — ใช้หน่วยนับสำรอง') + link + '</p>';
+  }
   function renderWork() {
     const p = $('[data-panel="work"]');
     const aggs = RE.aggregate(monthRecords());
@@ -579,8 +635,9 @@
         (ex[a.code] ? '<span class="pill info">ไม่ใส่ในไฟล์</span>' : n ? '<span class="pill ok">' + n + ' รูป</span>' : '<span class="pill warn">ยังไม่มีรูป</span>') +
         '<label class="small"><input type="checkbox" data-excl="' + a.code + '"' + (ex[a.code] ? ' checked' : '') + '> ไม่ใส่สไลด์นี้</label></div>' +
         '<div class="work"><div data-prev="' + a.code + '">' + slideHtml(spec) + '</div><div>' +
-        '<div class="row"><div style="width:130px"><label class="f">หน่วยนับ</label><input type="text" list="unitList" data-unit="' + a.code + '" value="' + esc(unitOf(a.code)) + '"></div>' +
+        '<div class="row"><div style="width:130px"><label class="f">หน่วยนับ</label>' + unitFieldHtml(a.code) + '</div>' +
         '<div class="muted small" style="flex:1">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + ' สายทาง</div></div>' +
+        unitNoteHtml(a.code) +
         '<div class="kv" style="margin:12px 0"><div>ปริมาณรวม</div><div>' + RE.fmtQty(a.qty) + ' ' + esc(unitOf(a.code)) + '</div><div>ค่าใช้จ่ายรวม</div><div><b>' + RE.fmt(a.total) + '</b> บาท</div>' +
         '<div>Unit Cost</div><div>' + RE.fmt(a.unitCost) + ' บาท/' + esc(unitOf(a.code)) + '</div></div>' +
         '<div class="drop small" data-pdrop="' + slot + '"><b>+ เพิ่มรูป</b> ลากมาวาง หรือคลิกเลือก (แนะนำ 4 รูป สูงสุด 6)</div>' +

@@ -142,6 +142,20 @@ table.tbl tr.bad td{background:#fff7f5}
 .pill.info{background:var(--navy-100);color:var(--navy-700)}
 ul.issues{margin:6px 0 0;padding-left:18px;font-size:13px}
 ul.issues li.error{color:var(--red)} ul.issues li.warn{color:var(--amber)} ul.issues li.info{color:var(--ink-soft)}
+/* ตารางผลตรวจไฟล์ก่อนบันทึก */
+table.pend td.small:nth-child(2){min-width:260px}
+table.pend .nm{max-width:250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;color:var(--ink-soft)}
+table.pend .nw{white-space:nowrap}
+table.pend td.dt{width:150px;min-width:130px;line-height:1.5}
+table.pend .c{text-align:center}
+table.pend tr.skip td{opacity:.5}
+table.pend tr.skip td:last-child{opacity:1}
+.dec{display:inline-flex;gap:6px}
+.dec button{width:30px;height:30px;padding:0;border:2px solid #c9d3de;border-radius:6px;background:#fff;color:#9aa7b4;font-size:16px;font-weight:700;line-height:1;cursor:pointer;font-family:inherit}
+.dec button:hover{border-color:var(--navy-700)}
+.dec button.yes.on{background:var(--green);border-color:var(--green);color:#fff}
+.dec button.no.on{background:var(--red);border-color:var(--red);color:#fff}
+.ok-mark{color:var(--green);font-weight:700}
 
 /* ที่วางไฟล์ */
 .drop{border:2px dashed #b9c6d4;border-radius:12px;padding:22px;text-align:center;color:var(--ink-soft);background:#fafcfe;cursor:pointer;transition:.15s}
