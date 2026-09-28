@@ -464,6 +464,7 @@
       if (blob.size <= MAX_BYTES) break;
       if (q > 0.7) q -= 0.08; else side = Math.round(side * 0.85);
     }
+    if (!blob || blob.size > MAX_BYTES) throw new Error('ย่อรูป "' + file.name + '" ให้เล็กพอไม่ได้ (เกิน 1 MB) — ลองใช้รูปอื่น');
     const bytes = new Uint8Array(await blob.arrayBuffer());
     const th = drawScaled(cv, 420);
     const thumb = th.toDataURL('image/jpeg', 0.72);
@@ -613,23 +614,57 @@
     const els = [{ type: 'bg', src: A('frame-work.jpg') }];
     els.push(title('รหัส ' + a.code + ' ' + a.name, 0.62, a.name.length > 45 ? 20 : 26));
 
-    const lines = a.lines.map(function (L) {
-      const q = RE.fmtQty(L.qty) + ' ' + unit;
-      const range = (L.fromM === L.toM) ? 'กม. ' + RE.mToKm(L.fromM) : 'กม. ' + RE.mToKm(L.fromM) + ' - กม. ' + RE.mToKm(L.toM);
-      return 'ทล.' + L.route + '   ตอน ' + RE.sectionName(L.route, L.ctrl, L.fromM) + '   ' + range + '   ( ' + q + ' )';
+    // รายการสายทาง — จัดเป็นตาราง 4 คอลัมน์ (ทล. | ตอน | ช่วง กม. | ปริมาณ) ให้แต่ละคอลัมน์ตรงกันทุกแถว
+    // ≤ 4 สาย: ตารางเดียวกลางสไลด์ / มากกว่านั้น: แบ่ง 2 ฝั่งซ้าย-ขวา มีเส้นคั่นกลาง
+    const rowsL = a.lines.map(function (L) {
+      const sec = RE.sectionName(L.route, L.ctrl, L.fromM);
+      return [
+        'ทล.' + L.route,
+        /^ตอน/.test(sec) ? sec : 'ตอน ' + sec,
+        (L.fromM === L.toM) ? 'กม. ' + RE.mToKm(L.fromM) : 'กม. ' + RE.mToKm(L.fromM) + ' – ' + RE.mToKm(L.toM),
+        RE.fmtQty(L.qty) + ' ' + unit
+      ];
     });
-    const n = lines.length;
-    const top = 1.62, avail = 1.33;
-    if (n <= 3) {
-      const size = 19;
-      els.push({ type: 'text', x: 2.4, y: top, w: 17.3, h: avail, text: lines.join('\n'), size: size, color: INK, align: 'center', valign: 'middle', lineSpacing: 1.15 });
-    } else {
-      const per = Math.ceil(n / 2);
-      const size = per <= 3 ? 15 : (per <= 4 ? 12.5 : 10.5);
-      els.push({ type: 'text', x: 2.45, y: top, w: 8.6, h: avail, text: lines.slice(0, per).join('\n'), size: size, color: INK, align: 'left', valign: 'middle', lineSpacing: 1.1 });
-      els.push({ type: 'text', x: 11.1, y: top, w: 8.6, h: avail, text: lines.slice(per).join('\n'), size: size, color: INK, align: 'left', valign: 'middle', lineSpacing: 1.1 });
-    }
-    els.push({ type: 'text', x: 2.4, y: 3.0, w: 17.3, h: 0.5, text: 'รวม   ' + RE.fmtQty(a.qty) + ' ' + unit, size: 19, bold: true, color: INK, align: 'center', valign: 'middle' });
+    const n = rowsL.length;
+    const top = 1.6, avail = 1.36;
+    const twoCol = n > 4;
+    const per = twoCol ? Math.ceil(n / 2) : n;
+    const rowH = Math.min(0.45, avail / Math.max(per, 1));
+    const tblW = twoCol ? 8.45 : 13.2;
+    const colR = twoCol ? [0.13, 0.36, 0.31, 0.20] : [0.12, 0.38, 0.29, 0.21];   // สัดส่วนความกว้างคอลัมน์
+    const colW = colR.map(function (r) { return r * tblW; });
+    // ขนาดตัวอักษร: ตามความสูงแถว แล้วลดลงถ้าข้อความยาวเกินคอลัมน์ (ประมาณความกว้างตัวอักษร ~0.56 เท่าของขนาด)
+    const visLen = function (s) { return String(s).replace(/[ัิ-ฺ็-๎]/g, '').length; };
+    let size = Math.min(twoCol ? 14 : 18, rowH * 72 * 0.6);
+    rowsL.forEach(function (r) {
+      r.forEach(function (t, ci) {
+        const need = visLen(t) * 0.56 / 72;              // นิ้วต่อ 1pt
+        const fit = (colW[ci] - 0.15) / need;
+        if (fit < size) size = fit;
+      });
+    });
+    size = Math.max(9, Math.round(size * 2) / 2);
+    const x0s = twoCol ? [2.45, 11.25] : [2.4 + (17.3 - tblW) / 2];
+    const bandY = top + (avail - per * rowH) / 2;
+    x0s.forEach(function (x0, side) {
+      rowsL.slice(side * per, side * per + per).forEach(function (r, i) {
+        const y = bandY + i * rowH;
+        if (i % 2 === 0) els.push({ type: 'rect', x: x0, y: y, w: tblW, h: rowH, fill: 'E6EEF8', radius: 0.05 });
+        let cx = x0;
+        r.forEach(function (t, ci) {
+          const w = colW[ci];
+          els.push({ type: 'text', x: cx + (ci === 0 ? 0.1 : 0.05), y: y, w: w - (ci === 3 ? 0.12 : 0.1), h: rowH, text: t, size: size,
+            bold: ci === 0 || ci === 3, color: ci === 0 ? NAVY : INK, align: ci === 3 ? 'right' : 'left', valign: 'middle', inset: 0 });
+          cx += w;
+        });
+      });
+    });
+    if (twoCol) els.push({ type: 'rect', x: 11.05, y: bandY, w: 0.02, h: per * rowH, fill: 'B8C4D6' });
+    // เส้นคั่นก่อนยอดรวม
+    els.push({ type: 'line', x: 6.4, y: 3.02, w: 9.3, color: 'B8C4D6', lineW: 0.75 });
+    els.push({ type: 'text', x: 2.4, y: 3.05, w: 17.3, h: 0.5, runs: [
+      { text: 'รวม ' + n + ' รายการ    ', size: 17, color: INK },
+      { text: RE.fmtQty(a.qty) + ' ' + unit, size: 19, bold: true, color: NAVY }], align: 'center', valign: 'middle' });
 
     // รูป
     const lay = RE.layout(photos, RE.PHOTO_AREA, 0.1, choice);

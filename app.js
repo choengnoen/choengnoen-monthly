@@ -1002,6 +1002,12 @@
     const bar = $('#expProg .progress>div');
     let step = 0;
     try {
+      const ids = [];
+      specs.forEach(function (s) { (s.els || []).forEach(function (e) { if (e.type === 'photo' && ids.indexOf(e.id) < 0) ids.push(e.id); }); });
+      if (ids.length && FBL.photoStore === 'drive') {
+        $('#expTxt').textContent = 'กำลังโหลดรูป ' + ids.length + ' รูปจาก Google Drive…';
+        await FBL.prefetchPhotos(ids);
+      }
       const pptx = await RE.buildPptx(specs, FBL.photoBytes, function (msg) {
         step++; bar.style.width = Math.min(95, step / specs.length * 95) + '%'; $('#expTxt').textContent = msg;
       });
@@ -1041,9 +1047,11 @@
       (Object.keys(byMonth).length ? '<table class="tbl" style="max-width:520px"><tr><th>เดือน</th><th class="num">รูป</th><th class="num">ขนาด</th><th></th></tr>' + Object.keys(byMonth).sort().map(function (m) {
         return '<tr><td>' + esc(RE.mkLabel(m)) + '</td><td class="num">' + byMonth[m].n + '</td><td class="num">' + RE.fmt(byMonth[m].size / 1048576, 1) + ' MB</td><td>' + (m === S.mk ? '<span class="small muted">เดือนปัจจุบัน</span>' : '<button class="btn btn-sm btn-danger" data-clr="' + m + '">ลบ</button>') + '</td></tr>';
       }).join('') + '</table>' : '<p class="muted">ไม่มีรูปในระบบ</p>') +
-      '<p class="small muted">Firebase แผนฟรีเก็บข้อมูลได้ 1 GB — รูปเดือนละ ~50 รูป ใช้ประมาณ 25–40 MB</p></div>';
+      (FBL.photoStore === 'drive'
+        ? '<p class="small muted">ตัวรูปเก็บใน Google Drive (โฟลเดอร์ "ระบบรายงานประจำเดือน - รูปภาพ" แยกตามเดือน) — ลบแล้วอยู่ในถังขยะของ Drive กู้คืนได้ 30 วัน</p></div>'
+        : '<p class="small muted">Firebase แผนฟรีเก็บข้อมูลได้ 1 GB — รูปเดือนละ ~50 รูป ใช้ประมาณ 25–40 MB</p></div>');
     h += '<div class="card"><div class="card-head"><h2>เกี่ยวกับระบบ</h2></div><div class="small">งานรายงานประจำเดือน หมวดทางหลวงเชิงเนิน · รุ่น 1.0 (26 ก.ย. 2569)<br>' +
-      'ฐานข้อมูล: ' + (FBL.demo ? '<b>โหมดทดลอง (เก็บในเครื่องนี้)</b>' : 'Firebase Firestore') + ' · สายทางจากฐานข้อมูลกลาง CN-Hub: ' + (window.CNMaster && CNMaster.routes && CNMaster.routes().length ? 'เชื่อมต่อแล้ว (' + CNMaster.routes().length + ' สาย)' : 'ยังไม่เชื่อมต่อ — ใช้ชื่อตอนสำรอง') + '</div></div>';
+      'ฐานข้อมูล: ' + (FBL.demo ? '<b>โหมดทดลอง (เก็บในเครื่องนี้)</b>' : 'Firebase Firestore') + ' · ที่เก็บรูป: ' + (FBL.photoStore === 'drive' ? 'Google Drive' : 'Firestore') + ' · สายทางจากฐานข้อมูลกลาง CN-Hub: ' + (window.CNMaster && CNMaster.routes && CNMaster.routes().length ? 'เชื่อมต่อแล้ว (' + CNMaster.routes().length + ' สาย)' : 'ยังไม่เชื่อมต่อ — ใช้ชื่อตอนสำรอง') + '</div></div>';
     p.innerHTML = h;
     $$('[data-clr]', p).forEach(function (b) {
       b.onclick = async function () {

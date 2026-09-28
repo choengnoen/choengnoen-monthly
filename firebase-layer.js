@@ -4,8 +4,9 @@
 
    - ล็อกอินด้วยชื่อ + รหัสผ่าน (อีเมลสังเคราะห์) และจัดการทีม — วิธีเดียวกับระบบงานอุบัติเหตุ
    - อ่านข้อมูลแบบ realtime + แคชในเครื่อง
-   - เก็บรูปภาพ (ย่อแล้ว) เป็นข้อมูลไบนารีใน Firestore คอลเลกชัน photoData (1 รูป = 1 เอกสาร ไม่เกิน ~1 MB)
-     รูปเก็บชั่วคราวเฉพาะเดือนที่กำลังทำรายงาน เริ่มเดือนใหม่แล้วลบของเดือนก่อน
+   - รูปภาพ (ย่อแล้ว ไม่เกิน ~1 MB): ข้อมูลรูป/รูปย่อใน Firestore คอลเลกชัน photos
+     ตัวรูปเก็บใน Google Drive ผ่าน drive-bridge.gs (ถ้าตั้ง DRIVE_BRIDGE_URL) ไม่งั้นเก็บใน Firestore คอลเลกชัน photoData
+     รูปเก็บชั่วคราวเฉพาะเดือนที่กำลังทำรายงาน เริ่มเดือนใหม่แล้วลบของเดือนก่อน (ใน Drive = ย้ายเข้าถังขยะ กู้คืนได้ 30 วัน)
 
    โหมดทดลอง: ถ้ายังไม่ได้ใส่ค่า firebaseConfig (apiKey ว่าง) ระบบทำงานแบบเก็บข้อมูลในเครื่องนี้เท่านั้น
    ใช้ทดลองหน้าจอ/ส่งออกไฟล์ได้ครบ แต่ไม่มีการล็อกอินจริงและเครื่องอื่นมองไม่เห็นข้อมูล
@@ -24,6 +25,10 @@
     messagingSenderId: "396498809334",
     appId: "1:396498809334:web:4ca212b79db672eebe97d7"
   };
+
+  // ▼▼▼ วาง URL ของ drive-bridge (Apps Script → Deploy → Web app ลงท้ายด้วย /exec) ▼▼▼
+  //     ว่างไว้ = เก็บรูปใน Firestore (photoData) แบบเดิม
+  const DRIVE_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbzLYR_FCTZBcPRzMDXiRGkxOjKQHHEXGmOnsYJZE6vp4lE3PSHftOq6gpMT3cNV_K1u/exec';
 
   const EMAIL_DOMAIN = 'monthly.invalid';
   const FBL = {};
@@ -409,8 +414,63 @@
   FBL.set = function (col, id, data, merge) { return FBL.commit([{ op: 'set', col: col, id: id, data: data, merge: !!merge }]); };
   FBL.del = function (col, id) { return FBL.commit([{ op: 'delete', col: col, id: id }]); };
 
-  /* ---------- รูปภาพ: ข้อมูลรูปเต็มแยกไว้ใน photoData (ไม่โหลดจนกว่าจะใช้) ---------- */
+  /* ---------- รูปภาพ: ข้อมูลรูป/รูปย่อใน photos · ตัวรูปใน Google Drive หรือ photoData (ไม่โหลดจนกว่าจะใช้) ---------- */
+  const DRIVE = !FBL.demo && /^https:\/\/script\.google\.com\/.+\/exec$/.test(DRIVE_BRIDGE_URL);
+  FBL.photoStore = DRIVE ? 'drive' : 'firestore';
+
+  async function bridge(body) {
+    if (!FBL._auth.currentUser) throw new Error('ยังไม่ได้ล็อกอิน');
+    body.idToken = await FBL._auth.currentUser.getIdToken();
+    let r, j;
+    // text/plain = ไม่ต้องมีคำขอ preflight (Apps Script ไม่รองรับ OPTIONS)
+    try { r = await fetch(DRIVE_BRIDGE_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) }); }
+    catch (e) { throw new Error('เชื่อมต่อ Google Drive ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'); }
+    try { j = await r.json(); } catch (e) { throw new Error('ตัวกลาง Google Drive ตอบกลับผิดรูปแบบ (ตรวจสอบการ Deploy ของ drive-bridge ว่าเลือก Who has access = Anyone)'); }
+    if (!j.ok) throw new Error(j.error || 'Google Drive ทำรายการไม่สำเร็จ');
+    return j;
+  }
+  function toB64(u8) {
+    let s = '';
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+  function fromB64(s) {
+    const bin = atob(s), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8;
+  }
+  function driveName(id) { return id + '.jpg'; }
+  // คำขออ่านที่เกิดพร้อมกันรวมเป็นคำขอเดียว ครั้งละไม่เกิน 8 รูป
+  let queue = [], timer = null;
+  function driveGet(id) {
+    return new Promise(function (resolve, reject) {
+      queue.push({ id: id, resolve: resolve, reject: reject });
+      if (!timer) timer = setTimeout(flushQueue, 40);
+    });
+  }
+  function flushQueue() {
+    timer = null;
+    const all = queue.splice(0, queue.length);
+    for (let i = 0; i < all.length; i += 8) {
+      const part = all.slice(i, i + 8);
+      bridge({ action: 'get', names: part.map(function (x) { return driveName(x.id); }) }).then(function (j) {
+        const by = {};
+        (j.files || []).forEach(function (f) { by[f.name] = f; });
+        part.forEach(function (x) {
+          const f = by[driveName(x.id)];
+          x.resolve(f && !f.missing ? fromB64(f.data) : null);
+        });
+      }, function (e) { part.forEach(function (x) { x.reject(e); }); });
+    }
+  }
+
   FBL.savePhoto = async function (id, meta, bytes) {
+    if (DRIVE) {
+      const j = await bridge({ action: 'put', name: driveName(id), month: meta.mk, slot: meta.slot, orig: meta.name, data: toB64(bytes) });
+      if (j.size !== bytes.length) throw new Error('อัปโหลดรูปไม่ครบ กรุณาลองใหม่');
+      await FBL.set('photos', id, Object.assign({}, meta, { store: 'drive' }));
+      return;
+    }
     await FBL.commit([
       { op: 'set', col: 'photoData', id: id, data: { data: store.toBytes(bytes), mk: meta.mk } },
       { op: 'set', col: 'photos', id: id, data: meta }
@@ -419,13 +479,24 @@
   const photoCache = new Map();
   FBL.photoBytes = async function (id) {
     if (photoCache.has(id)) return photoCache.get(id);
-    const d = await FBL.get('photoData', id);
-    if (!d || !d.data) throw new Error('ไม่พบข้อมูลรูป (อาจถูกลบไปแล้ว)');
-    const u8 = store.fromBytes(d.data);
+    let u8 = DRIVE ? await driveGet(id) : null;
+    if (!u8) {   // รูปที่อัปโหลดก่อนเปลี่ยนมาใช้ Drive ยังอยู่ใน photoData
+      const d = await FBL.get('photoData', id);
+      if (!d || !d.data) throw new Error('ไม่พบข้อมูลรูป (อาจถูกลบไปแล้ว)');
+      u8 = store.fromBytes(d.data);
+    }
     photoCache.set(id, u8);
     return u8;
   };
+  // โหลดรูปล่วงหน้าพร้อมกันหลายรูป (ก่อนส่งออก) — รูปที่โหลดไม่ได้ข้ามไป ให้ photoBytes แจ้งตอนใช้จริง
+  FBL.prefetchPhotos = function (ids) {
+    return Promise.all(ids.map(function (id) { return FBL.photoBytes(id).catch(function () { return null; }); }));
+  };
   FBL.deletePhotos = async function (ids) {
+    if (DRIVE) {
+      // ย้ายเข้าถังขยะของ Drive (กู้คืนได้ 30 วัน) ก่อน แล้วค่อยลบข้อมูลรูปใน Firestore
+      for (let i = 0; i < ids.length; i += 100) await bridge({ action: 'del', names: ids.slice(i, i + 100).map(driveName) });
+    }
     const ops = [];
     ids.forEach(function (id) {
       ops.push({ op: 'delete', col: 'photos', id: id });
