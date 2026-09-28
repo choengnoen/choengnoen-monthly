@@ -997,6 +997,7 @@
     const cum = RE.cumulative(plan, S.records, S.mk);
     let h = '<div class="card"><div class="card-head"><h2>แผนงบประมาณบำรุงปกติ ปีงบประมาณ ' + fy + '</h2><div class="sp"></div>' +
       (can ? '<button class="btn btn-primary" id="savePlan">บันทึกแผน</button>' : '<span class="pill info">แก้ไขได้เฉพาะเจ้าของระบบ/ผู้ดูแลระบบ</span>') + '</div>' +
+      (can ? '<div class="drop" id="planDrop" style="margin-bottom:14px"><b>นำเข้าไฟล์รายงานแผน-ผลจากระบบของแขวง (เช่น report01.csv)</b><br><span class="small muted">ระบบจะกรอกแผน และผลสะสมถึงเดือน ' + esc(RE.mkLabel(S.mk)) + ' ตามกลุ่มงานให้อัตโนมัติ</span></div>' : '') +
       '<div class="grid2"><div><h3 style="margin-bottom:8px">แผนและผลตามกลุ่มงาน</h3><div class="tbl-wrap"><table class="tbl"><tr><th>กลุ่มงาน</th><th class="num">แผน (บาท)</th><th class="num">ผลสะสมยกมา</th><th class="num">ผลสะสม ณ ' + esc(RE.mkShort(S.mk)) + '</th></tr>';
     RE.GROUPS.forEach(function (g) {
       h += '<tr><td><span class="pill" style="background:#' + g.color + ';color:#fff">' + g.code + '</span> ' + esc(g.name) + '</td>' +
@@ -1030,6 +1031,41 @@
       const d = readPlanForm(fy);
       run(function () { return FBL.set('plans', String(fy), Object.assign(d, { fy: fy, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name })); }, 'บันทึกแผนแล้ว').then(renderPlan);
     };
+    if ($('#planDrop')) bindDrop($('#planDrop'), '.csv,text/csv', false, importPlanReport);
+  }
+  // นำเข้ารายงานแผน-ผลของแขวง: แผน → แผนรายกลุ่ม, ผล → "ผลสะสมยกมา" ถึงเดือนที่เลือกอยู่
+  // (เดือนถัดไประบบคำนวณต่อจาก Export_CSV ที่นำเข้าในแท็บ ①)
+  async function importPlanReport(files) {
+    const f = files.filter(function (x) { return /\.csv$/i.test(x.name); })[0];
+    if (!f) { toast('ไม่พบไฟล์ .csv', 'err'); return; }
+    let r;
+    try { r = RE.parsePlanReport(await RE.decodeFile(f)); } catch (e) { toast(e.message || String(e), 'err'); return; }
+    const fy = RE.fyOf(S.mk), upto = RE.fyIndex(S.mk);
+    const warn = [];
+    ['plan', 'result'].forEach(function (k) {
+      const t = r.fileTotal[k], mine = k === 'plan' ? r.planTotal : r.resultTotal;
+      if (t != null && Math.abs(t - mine) > 1) warn.push('ยอด' + (k === 'plan' ? 'แผน' : 'ผล') + 'รวมกลุ่มงาน ' + RE.fmt(mine) + ' ไม่ตรงกับแถว "รวม" ในไฟล์ ' + RE.fmt(t));
+    });
+    const csvMonths = RE.fyMonths(fy).slice(0, upto + 1).filter(function (m) { return S.records.some(function (x) { return x.mk === m; }); });
+    let h = '<p>ไฟล์ <b>' + esc(f.name) + '</b> — ผลในไฟล์จะถือเป็น <b>ผลสะสมตั้งแต่ ต.ค. ถึง ' + esc(RE.mkLabel(S.mk)) + '</b> (ปีงบ ' + fy + ')</p>' +
+      '<div class="tbl-wrap"><table class="tbl"><tr><th>กลุ่มงาน</th><th class="num">แผน (บาท)</th><th class="num">ผลสะสม (บาท)</th><th class="num">ผล/แผน</th></tr>';
+    RE.GROUPS.forEach(function (g) {
+      const pv = r.plan[g.code], rv = r.result[g.code];
+      h += '<tr><td>' + g.code + ' ' + esc(g.name) + '</td><td class="num">' + RE.fmt(pv) + '</td><td class="num">' + RE.fmt(rv) + '</td><td class="num">' + (pv ? RE.fmt(rv / pv * 100) + '%' : '—') + '</td></tr>';
+    });
+    h += '<tr class="tot"><td>รวม</td><td class="num">' + RE.fmt(r.planTotal) + '</td><td class="num">' + RE.fmt(r.resultTotal) + '</td><td class="num">' + (r.planTotal ? RE.fmt(r.resultTotal / r.planTotal * 100) + '%' : '—') + '</td></tr></table></div>';
+    if (warn.length) h += '<p class="small" style="color:#B03A2E">⚠ ' + warn.map(esc).join('<br>⚠ ') + '</p>';
+    h += '<p class="small muted">ถ้าไฟล์นี้ไม่ใช่ข้อมูลถึงเดือน ' + esc(RE.mkLabel(S.mk)) + ' ให้กดยกเลิก แล้วเปลี่ยนเดือนด้านบนก่อน · แผนสะสม (%) รายเดือนที่กรอกไว้จะคงเดิม</p>';
+    if (csvMonths.length) h += '<p class="small muted">เดือน ' + csvMonths.map(RE.mkShort).join(', ') + ' มีผลงานจาก Export_CSV อยู่แล้ว — ยอดแผน-ผลจะใช้ตัวเลขจากไฟล์นี้แทน (ข้อมูลผลงานรายไฟล์ไม่ถูกลบ)</p>';
+    if (!await modal({ title: 'นำเข้ารายงานแผน-ผล', html: h, ok: 'บันทึกแผน-ผล', wide: true })) return;
+    const d = readPlanForm(fy);
+    d.groups = r.plan;
+    d.carryMk = S.mk;
+    d.carryGroups = r.result;
+    d.carryCum = (d.carryCum || []).slice(0, upto + 1);
+    d.carryCum[upto] = r.resultTotal;
+    d.planSource = { file: f.name, mk: S.mk, importedAt: FBL.nowIso(), importedBy: FBL.user.name };
+    run(function () { return FBL.set('plans', String(fy), Object.assign(d, { fy: fy, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name })); }, 'อัปเดตแผน-ผลจากไฟล์แล้ว').then(renderPlan);
   }
   function fmtIn(v) { return v == null || v === '' ? '' : RE.fmt(v); }
   function renderPlanPreview() {

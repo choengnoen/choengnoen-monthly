@@ -419,6 +419,35 @@
   };
   function sumObj(o) { return Object.keys(o || {}).reduce(function (s, k) { return s + (Number(o[k]) || 0); }, 0); }
 
+  // อ่านไฟล์รายงานแผน-ผลจากระบบของแขวง (เช่น report01.csv) → แผน/ผลสะสม ตามกลุ่มงาน (คอลัมน์ "งบประมาณบำรุงปกติ")
+  // ใช้ตารางสรุปตามกลุ่มงาน (21100…21600) ถ้ามี ไม่มีจึงรวมจากตารางรายรหัสงาน แล้วเทียบกับแถว "รวม" ในไฟล์
+  RE.parsePlanReport = function (text) {
+    const rows = parseCsv(text);
+    const kind = function (v) { v = String(v || '').trim(); return v === 'แผน' ? 'plan' : v === 'ผล' ? 'result' : ''; };
+    const out = { plan: {}, result: {}, source: '', fileTotal: { plan: null, result: null } };
+    RE.GROUPS.forEach(function (g) { out.plan[g.code] = 0; out.result[g.code] = 0; });
+    rows.forEach(function (r) {
+      const k = kind(r[2]);
+      if (k && /^21[1-6]00$/.test(r[0])) { out[k][r[0]] += num(r[4]); out.source = 'group'; }
+    });
+    if (!out.source) {
+      rows.forEach(function (r) {
+        const m = String(r[0] || '').match(/^(21\d{3})\s*:/), k = kind(r[2]);
+        if (m && k && out[k][RE.groupOf(m[1])] !== undefined) { out[k][RE.groupOf(m[1])] += num(r[4]); out.source = 'code'; }
+      });
+    }
+    if (!out.source) throw new Error('ไฟล์นี้ไม่ใช่รายงานแผน-ผล (ไม่พบแถวรหัสงาน/กลุ่มงานที่มี "แผน" และ "ผล")');
+    rows.forEach(function (r) {
+      if (String(r[0]).trim() !== 'รวม') return;
+      const k = kind(r[1]) || kind(r[2]);
+      if (k && out.fileTotal[k] == null) out.fileTotal[k] = num(r[4]);
+    });
+    ['plan', 'result'].forEach(function (k) { Object.keys(out[k]).forEach(function (c) { out[k][c] = round2(out[k][c]); }); });
+    out.planTotal = round2(sumObj(out.plan));
+    out.resultTotal = round2(sumObj(out.result));
+    return out;
+  };
+
   /* ======================================================================
      รูปภาพ
      ====================================================================== */
