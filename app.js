@@ -1019,8 +1019,18 @@
     });
     h += '</table></div><p class="small muted">แผนสะสม (%) ให้กรอกตามแผนการใช้จ่ายของแขวง (เส้นสีส้มในกราฟ)</p></div></div></div>' +
       '<div class="grid2"><div class="card"><h3 style="margin-bottom:10px">ตัวอย่าง: แผน-ผล ตามรหัสงาน</h3><div id="planPrev1"></div></div>' +
-      '<div class="card"><h3 style="margin-bottom:10px">ตัวอย่าง: ความก้าวหน้าการใช้งบประมาณ</h3><div id="planPrev2"></div></div></div>';
+      '<div class="card"><h3 style="margin-bottom:10px">ตัวอย่าง: ความก้าวหน้าการใช้งบประมาณ</h3><div id="planPrev2"></div>' +
+      '<div class="drop small" style="margin-top:10px" data-pdrop-budget="1"><b>+ เพิ่มรูปกราฟ</b> — แคปกราฟจากระบบของกรมแล้วลากมาวาง หรือคลิกเลือก (รูปใหม่จะแทนรูปเดิม)</div>' +
+      (photosOf('budget').length ? thumbsHtml('budget') : '') +
+      '<label class="f" style="margin-top:12px">ข้อความใต้กราฟ บรรทัดที่ 1 (ระบบอ่านจากรูปให้ แก้ได้)</label><input type="text" id="budgetLine1" value="' + esc(rep().budgetLine1 || '') + '">' +
+      '<label class="f" style="margin-top:8px">บรรทัดที่ 2</label><input type="text" id="budgetLine2" value="' + esc(rep().budgetLine2 || '') + '">' +
+      '</div></div>';
     p.innerHTML = h;
+    bindThumbs(p);
+    bindDrop($('[data-pdrop-budget]', p), 'image/*', false, addBudgetImage);
+    const saveLines = debounce(function () { run(function () { return saveReport({ budgetLine1: $('#budgetLine1').value.trim(), budgetLine2: $('#budgetLine2').value.trim() }); }); }, 700);
+    $('#budgetLine1').addEventListener('input', saveLines);
+    $('#budgetLine2').addEventListener('input', saveLines);
     renderPlanPreview();
     p.oninput = function () { renderPlanPreview(); };
     $('#carryMk').onchange = function () {
@@ -1062,10 +1072,36 @@
     d.groups = r.plan;
     d.carryMk = S.mk;
     d.carryGroups = r.result;
-    d.carryCum = (d.carryCum || []).slice(0, upto + 1);
-    d.carryCum[upto] = r.resultTotal;
+    // Firestore ไม่รับช่องว่าง (undefined) ในอาร์เรย์ — เติม null ให้ครบทุกเดือนถึงเดือนนี้
+    const oldCum = d.carryCum || [];
+    d.carryCum = [];
+    for (let i = 0; i <= upto; i++) d.carryCum.push(i === upto ? r.resultTotal : (oldCum[i] == null ? null : oldCum[i]));
+    d.pct = (d.pct || []).slice(0, 12);
+    for (let i = 0; i < 12; i++) if (d.pct[i] === undefined || (typeof d.pct[i] === 'number' && !isFinite(d.pct[i]))) d.pct[i] = null;
     d.planSource = { file: f.name, mk: S.mk, importedAt: FBL.nowIso(), importedBy: FBL.user.name };
     run(function () { return FBL.set('plans', String(fy), Object.assign(d, { fy: fy, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name })); }, 'อัปเดตแผน-ผลจากไฟล์แล้ว').then(renderPlan);
+  }
+  function budgetImg() { const b = photosOf('budget')[0]; return b ? photoSpec(b) : null; }
+  // ข้อความ 2 บรรทัดใต้กราฟ (เก็บในรายงานของเดือน) — ช่องที่กำลังแก้อยู่มาก่อนค่าที่บันทึกไว้
+  function budgetLines() {
+    const r = rep();
+    return [$('#budgetLine1') ? $('#budgetLine1').value : (r.budgetLine1 || ''), $('#budgetLine2') ? $('#budgetLine2').value : (r.budgetLine2 || '')];
+  }
+  // ใส่รูปกราฟ: บันทึกรูป + อ่าน % แผน/ผลจากรูปแล้วกรอก 2 บรรทัดให้ (อ่านจากไฟล์ต้นฉบับที่คมกว่ารูปที่ย่อแล้ว)
+  function addBudgetImage(files) {
+    const f = files.filter(function (x) { return /^image\//.test(x.type) || /\.(jpe?g|png|webp)$/i.test(x.name); })[0];
+    if (!f) { toast('ไม่พบไฟล์รูปภาพ', 'err'); return; }
+    addPhotos([f], 'budget', { single: true });
+    const t = toast('กำลังอ่านตัวเลขจากรูปกราฟ…', '', 120000);
+    RE.readBudgetChart(f).then(function (v) {
+      t.remove();
+      if (!v) { toast('อ่านตัวเลข % แผน/ผล จากรูปไม่ได้ — พิมพ์ 2 บรรทัดใต้กราฟเองได้', 'err', 7000); return; }
+      const l = RE.budgetLinesFrom(S.mk, v);
+      if ($('#budgetLine1')) { $('#budgetLine1').value = l[0]; $('#budgetLine2').value = l[1]; renderPlanPreview(); }
+      return saveReport({ budgetLine1: l[0], budgetLine2: l[1] }).then(function () {
+        toast('อ่านได้: แผน ' + RE.fmt(v.plan) + '% · ผล ' + RE.fmt(v.result) + '% — ตรวจตัวเลขเทียบกับรูปอีกครั้ง', 'ok', 7000);
+      });
+    }).catch(function (e) { t.remove(); console.error(e); toast(e.message || String(e), 'err'); });
   }
   function fmtIn(v) { return v == null || v === '' ? '' : RE.fmt(v); }
   function renderPlanPreview() {
@@ -1076,7 +1112,7 @@
     if ($('#resTot')) $('#resTot').textContent = RE.fmt(cum.resultTotal);
     RE.GROUPS.forEach(function (g) { const c = $('[data-res="' + g.code + '"]'); if (c) c.textContent = RE.fmt(cum.groups[g.code] || 0); });
     if ($('#planPrev1')) $('#planPrev1').innerHTML = slideHtml(RE.slidePlan(S.mk, plan, cum));
-    if ($('#planPrev2')) $('#planPrev2').innerHTML = slideHtml(RE.slideBudget(S.mk, plan, cum));
+    if ($('#planPrev2')) $('#planPrev2').innerHTML = slideHtml(RE.slideBudget(S.mk, plan, cum, budgetImg(), budgetLines()));
   }
 
   /* ======================================================================
@@ -1094,7 +1130,8 @@
       specs.push(workSpec(a));
     });
     if (aggs.length) specs.push(RE.slideMonthSummary(S.mk, aggs));
-    if (plan && cum.planTotal > 0) { specs.push(RE.slidePlan(S.mk, plan, cum)); specs.push(RE.slideBudget(S.mk, plan, cum)); }
+    if (plan && cum.planTotal > 0) specs.push(RE.slidePlan(S.mk, plan, cum));
+    if (budgetImg()) specs.push(RE.slideBudget(S.mk, plan || {}, cum, budgetImg(), budgetLines()));
     (r.problems || []).forEach(function (pr) { problemSpecs(pr).forEach(function (s) { specs.push(s); }); });
     specs.push(RE.slideEnd());
     return specs;
@@ -1120,7 +1157,8 @@
       ck(recs.length, 'นำเข้าผลงาน ' + recs.length + ' ไฟล์') +
       ck(!noPhoto.length, noPhoto.length ? 'รหัสงานที่ยังไม่มีรูป: ' + noPhoto.map(function (a) { return a.code; }).join(', ') : 'ทุกรหัสงานมีรูปครบ', true) +
       ck(true, photosOf('cover').length ? 'หน้าปก: ใช้รูปที่เลือก' : 'หน้าปก: ใช้รูปเริ่มต้น') +
-      ck(planOk, planOk ? 'มีแผนงบประมาณปี ' + fy + ' (ใส่สไลด์แผน-ผล และกราฟความก้าวหน้า)' : 'ยังไม่มีแผนงบปี ' + fy + ' — ข้ามสไลด์แผน-ผล (กรอกได้ที่แท็บ ④)', true) +
+      ck(planOk, planOk ? 'มีแผนงบประมาณปี ' + fy + ' (ใส่สไลด์สรุปแผน-ผล)' : 'ยังไม่มีแผนงบปี ' + fy + ' — ข้ามสไลด์แผน-ผล (นำเข้าได้ที่แท็บ ④)', true) +
+      ck(!!budgetImg(), budgetImg() ? 'กราฟความก้าวหน้า: ใช้รูปที่ใส่ไว้' : 'ยังไม่ได้ใส่รูปกราฟความก้าวหน้า — ข้ามสไลด์นี้ (เพิ่มได้ที่แท็บ ④)', true) +
       ck(true, (r.problems || []).length ? 'ปัญหาอุปสรรค ' + r.problems.length + ' เรื่อง / ' + probPts + ' จุด' : 'ไม่มีปัญหาอุปสรรค (ไม่มีสไลด์หน้านี้)') +
       '</ul></div><div><label class="f">ชื่อไฟล์</label><input type="text" id="outName" value="' + esc(defaultFileName()) + '">' +
       '<div class="row" style="margin-top:12px"><button class="btn btn-gold" id="doExport"' + (recs.length ? '' : ' disabled') + '>⬇ ส่งออก PowerPoint (' + specs.length + ' สไลด์)</button></div>' +

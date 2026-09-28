@@ -837,36 +837,84 @@
     return { kind: 'plan', title: 'แผน-ผล ตามรหัสงาน', els: els };
   };
 
-  // กราฟความก้าวหน้าการใช้งบประมาณ
-  RE.slideBudget = function (mk, plan, cum) {
+  // กราฟความก้าวหน้าการใช้งบประมาณ — ใช้รูปกราฟที่แคปจากระบบของกรม (img = photoSpec) วางเต็มกรอบโดยไม่ครอป
+  RE.slideBudget = function (mk, plan, cum, img, lines) {
     const els = [{ type: 'bg', src: A('frame-budget.jpg') }];
     els.push({ type: 'text', x: 2.4, y: 0.75, w: 17.3, h: 1.3, text: 'กราฟแสดงความก้าวหน้า\nการใช้งบประมาณบำรุงปกติ', size: 26, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.3 });
-    const pct = (plan && plan.pct) || [];
-    const labels = cum.months.map(function (m) { const p = m.split('-'); return Number(p[1]) + '-' + p[0]; });
-    const planVals = labels.map(function (_, i) { const v = Number(pct[i]); return isFinite(v) && pct[i] !== '' && pct[i] != null ? v : null; });
-    const resVals = cum.cum.map(function (v) { return v == null || !cum.planTotal ? null : Math.round(v / cum.planTotal * 10000) / 100; });
-    els.push({ type: 'chart', kind: 'line', x: 3.1, y: 2.4, w: 15.9, h: 6.2, labels: labels,
-      series: [{ name: 'แผน', values: planVals, color: 'FF6600' }, { name: 'ผล', values: resVals, color: '1E7B1E' }] });
-    const rPct = cum.planTotal ? cum.resultTotal / cum.planTotal * 100 : 0;
-    const pNow = planVals[cum.upto];
-    const diff = pNow == null ? null : rPct - pNow;
-    // กล่องค่าของเดือนปัจจุบัน (แทนตัวเลขทุกจุดที่ซ้อนกัน)
-    els.push({ type: 'rect', x: 4.2, y: 2.55, w: 4.3, h: 1.05, fill: 'FFFFFF', line: 'BBBBBB', lineW: 0.75, radius: 0.08, shadow: true });
-    els.push({ type: 'text', x: 4.3, y: 2.58, w: 4.1, h: 1.0, runs: [
-      { text: RE.mkLabel(mk) + '\n', bold: true, color: INK },
-      { text: 'แผน ' + (pNow == null ? '-' : RE.fmt(pNow)) + '%', bold: true, color: 'FF6600' },
-      { text: '     ผล ' + RE.fmt(rPct) + '%', bold: true, color: '1E7B1E' }], size: 16, align: 'center', valign: 'middle', lineSpacing: 1.1 });
-    const runs2 = [{ text: 'ผลบำรุงปกติ      ' + RE.fmt(cum.resultTotal) + ' บาท    คิดเป็น   ' + RE.fmt(rPct) + ' %', color: INK }];
-    if (diff != null) {
-      runs2.push({ text: '  ( ผล ', color: INK });
-      runs2.push({ text: diff >= 0 ? 'มากกว่า' : 'น้อยกว่า', color: RED });
-      runs2.push({ text: ' แผน ', color: INK });
-      runs2.push({ text: RE.fmt(Math.abs(diff)) + '%', color: RED });
-      runs2.push({ text: ' )', color: INK });
+    const box = { x: 3.1, y: 2.25, w: 15.9, h: 6.55 };
+    if (img && img.w && img.h) {
+      const ar = img.w / img.h;
+      const w = ar > box.w / box.h ? box.w : box.h * ar, h = w / ar;
+      els.push({ type: 'photo', id: img.id, pw: img.w, ph: img.h, fx: 0.5, fy: 0.5, x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w: w, h: h });
+    } else {
+      els.push({ type: 'rect', x: box.x, y: box.y, w: box.w, h: box.h, fill: 'F4F6FA', line: 'BBBBBB', lineW: 0.75, text: 'ยังไม่ได้ใส่รูปกราฟ (แท็บ ④ แผน-ผล → เพิ่มรูปกราฟ)', size: 18, color: '888888' });
     }
-    els.push({ type: 'text', x: 3.1, y: 8.95, w: 15.9, h: 0.55, text: 'แผนบำรุงปกติ    ' + RE.fmt(cum.planTotal) + ' บาท    คิดเป็น   100.00 %    ของงบประมาณที่ได้รับ', size: 17, color: INK, align: 'center', valign: 'middle' });
-    els.push({ type: 'text', x: 3.1, y: 9.55, w: 15.9, h: 0.55, runs: runs2, size: 17, align: 'center', valign: 'middle' });
+    // 2 บรรทัดใต้กราฟ: ผู้ใช้พิมพ์เอง (lines = [บรรทัดบน, บรรทัดล่าง]) — เว้นว่าง = ไม่แสดง
+    (lines || []).slice(0, 2).forEach(function (t, i) {
+      t = String(t || '').trim();
+      if (t) els.push({ type: 'text', x: 3.1, y: [8.95, 9.55][i], w: 15.9, h: 0.55, text: t, size: 17, color: INK, align: 'center', valign: 'middle' });
+    });
     return { kind: 'budget', title: 'ความก้าวหน้าการใช้งบ', els: els };
+  };
+
+  // อ่าน % แผน / % ผล จากรูปกราฟที่แคปจากระบบของกรม (อ่านตัวอักษรในรูปด้วย Tesseract — โหลดเมื่อใช้ครั้งแรก)
+  // อ่านจากคำอธิบายกราฟแถวล่างสุด "แผน 92.62  ผล 83.18" (ซ้าย = แผน, ขวา = ผล) ไม่พบจึงอ่านทั้งรูป
+  // คืน { plan, result } (ตัวเลข %) หรือ null ถ้าอ่านไม่ได้
+  let tessLoading = null;
+  function loadTesseract() {
+    if (window.Tesseract) return Promise.resolve(window.Tesseract);
+    if (!tessLoading) tessLoading = new Promise(function (res, rej) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+      s.onload = function () { res(window.Tesseract); };
+      s.onerror = function () { tessLoading = null; rej(new Error('โหลดตัวอ่านตัวเลขจากรูปไม่ได้ (ตรวจอินเทอร์เน็ต)')); };
+      document.head.appendChild(s);
+    });
+    return tessLoading;
+  }
+  function cropScaled(img, y0, y1, scale) {
+    const cv = document.createElement('canvas');
+    const sh = Math.round((y1 - y0) * img.naturalHeight);
+    cv.width = Math.round(img.naturalWidth * scale); cv.height = Math.round(sh * scale);
+    const g = cv.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(img, 0, Math.round(y0 * img.naturalHeight), img.naturalWidth, sh, 0, 0, cv.width, cv.height);
+    return cv;
+  }
+  function pctWords(data) {
+    return (data.words || []).map(function (w) {
+      const m = String(w.text).replace(/,/g, '.').match(/(\d{1,3}\.\d{2})/);
+      const v = m ? Number(m[1]) : NaN;
+      return isFinite(v) && v >= 0 && v <= 150 ? { v: v, x: w.bbox.x0, y: (w.bbox.y0 + w.bbox.y1) / 2, h: w.bbox.y1 - w.bbox.y0 } : null;
+    }).filter(Boolean);
+  }
+  RE.readBudgetChart = async function (file) {
+    const T = await loadTesseract();
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise(function (res, rej) { const i = new Image(); i.onload = function () { res(i); }; i.onerror = function () { rej(new Error('เปิดรูปไม่ได้')); }; i.src = url; });
+      const worker = await T.createWorker('eng');
+      try {
+        await worker.setParameters({ tessedit_pageseg_mode: '11' });   // ข้อความกระจัดกระจาย (เหมาะกับกราฟ)
+        // รอบ 1: แถบล่าง 25% ของรูป (คำอธิบายกราฟ) ขยาย 3 เท่า
+        let ws = pctWords((await worker.recognize(cropScaled(img, 0.75, 1, 3))).data);
+        if (ws.length >= 2) {
+          const maxY = Math.max.apply(null, ws.map(function (w) { return w.y; }));
+          const row = ws.filter(function (w) { return maxY - w.y < Math.max(w.h, 10) * 1.2; }).sort(function (a, b) { return a.x - b.x; });
+          if (row.length >= 2) return { plan: row[0].v, result: row[1].v };
+        }
+        // รอบ 2: ทั้งรูป ขยาย 2 เท่า — ใช้ 2 ค่าแรกตามลำดับการอ่าน (ป้ายแผนอยู่เหนือป้ายผล)
+        ws = pctWords((await worker.recognize(cropScaled(img, 0, 1, 2))).data);
+        return ws.length >= 2 ? { plan: ws[0].v, result: ws[1].v } : null;
+      } finally { await worker.terminate(); }
+    } finally { URL.revokeObjectURL(url); }
+  };
+  // ข้อความ 2 บรรทัดใต้กราฟ จาก % ที่อ่านได้
+  RE.budgetLinesFrom = function (mk, v) {
+    const d = v.result - v.plan;
+    return ['แผนสะสม ณ เดือน' + RE.mkLabel(mk) + '    ' + RE.fmt(v.plan) + ' %',
+      'ผลสะสม ณ เดือน' + RE.mkLabel(mk) + '    ' + RE.fmt(v.result) + ' %    ( ผล' + (d >= 0 ? 'มากกว่า' : 'น้อยกว่า') + 'แผน ' + RE.fmt(Math.abs(d)) + ' % )'];
   };
 
   /* ---------------- ปัญหา อุปสรรค (แบบฟอร์มมีโครงสร้าง) ----------------
