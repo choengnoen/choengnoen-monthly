@@ -86,7 +86,7 @@
     const st = 'justify-content:' + jc + ';align-items:' + ai + ';font-size:' + fs(e.size || 16) + ';color:#' + (e.color || '1A1A1A') + ';' +
       (e.bold ? 'font-weight:600;' : '') + (e.italic ? 'font-style:italic;' : '') + (e.lineSpacing ? 'line-height:' + (1.2 * e.lineSpacing) + ';' : '') +
       (e.lineSpacingPt ? 'line-height:' + fs(e.lineSpacingPt) + ';' : '') + (e.charSpacing ? 'letter-spacing:' + fs(e.charSpacing) + ';' : '') +
-      (e.glow ? 'text-shadow:0 0 .5cqw #fff,0 0 1cqw #fff,0 0 1.6cqw #fff;' : '');
+      (e.glow ? 'text-shadow:0 0 .5cqw #fff,0 0 1cqw #fff,0 0 1.6cqw #fff;' : '') + (e.wrap === false ? 'white-space:pre;' : '');
     return '<div class="el-text" style="' + pos(e) + st + '"><div style="text-align:' + (e.align || 'left') + ';width:100%">' + inner + '</div></div>';
   }
   function photoBg(url, pw, ph, e) {

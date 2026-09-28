@@ -608,63 +608,65 @@
     return { kind: 'cover', title: 'หน้าปก', els: els };
   };
 
+  // ความกว้างข้อความ (นิ้ว) ด้วยฟอนต์ Prompt — วัดจริงด้วย canvas ถ้าวัดไม่ได้ใช้ค่าประมาณ
+  let measureCtx = null;
+  function textWidthIn(s, sizePt) {
+    try {
+      if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+      measureCtx.font = '100px Prompt, sans-serif';
+      return measureCtx.measureText(String(s)).width / 100 * sizePt / 72;
+    } catch (e) {
+      return String(s).replace(/[ัิ-ฺ็-๎]/g, '').length * 0.5 * sizePt / 72;
+    }
+  }
+
   // หน้ารายรหัสงาน — a: ผลสรุปรหัสงาน, unit: หน่วยนับ, photos: [{id, w, h, fx, fy}], choice: แบบจัดวางที่เลือก
   RE.PHOTO_AREA = { x: 2.75, y: 3.85, w: 10.5, h: 6.42 };
   RE.slideWork = function (a, unit, photos, choice) {
     const els = [{ type: 'bg', src: A('frame-work.jpg') }];
     els.push(title('รหัส ' + a.code + ' ' + a.name, 0.62, a.name.length > 45 ? 20 : 26));
 
-    // รายการสายทาง — จัดเป็นตาราง 4 คอลัมน์ (ทล. | ตอน | ช่วง กม. | ปริมาณ) ให้แต่ละคอลัมน์ตรงกันทุกแถว
-    // ≤ 4 สาย: ตารางเดียวกลางสไลด์ / มากกว่านั้น: แบ่ง 2 ฝั่งซ้าย-ขวา มีเส้นคั่นกลาง
+    // รายการสายทาง — แบบต้นฉบับ: สายละ 1 บรรทัด จัดกลาง
+    //   "ทล.3139   ตอน บ้านแลง – หาดใหญ่   กม. 12+000 - กม. 13+000   ( 400 ตร.ม. )"
+    // ≤ 4 สาย: คอลัมน์เดียวกลางสไลด์ / มากกว่านั้น: แบ่ง 2 ฝั่งซ้าย-ขวา มีเส้นคั่นกลาง
+    const SP = '   ';
     const rowsL = a.lines.map(function (L) {
       const sec = RE.sectionName(L.route, L.ctrl, L.fromM);
-      return [
-        'ทล.' + L.route,
-        /^ตอน/.test(sec) ? sec : 'ตอน ' + sec,
-        (L.fromM === L.toM) ? 'กม. ' + RE.mToKm(L.fromM) : 'กม. ' + RE.mToKm(L.fromM) + ' – ' + RE.mToKm(L.toM),
-        RE.fmtQty(L.qty) + ' ' + unit
-      ];
+      return 'ทล.' + L.route + SP + (/^ตอน/.test(sec) ? sec : 'ตอน ' + sec) + SP +
+        ((L.fromM === L.toM) ? 'กม. ' + RE.mToKm(L.fromM) : 'กม. ' + RE.mToKm(L.fromM) + ' - กม. ' + RE.mToKm(L.toM)) + SP +
+        '( ' + RE.fmtQty(L.qty) + ' ' + unit + ' )';
     });
     const n = rowsL.length;
     const top = 1.6, avail = 1.36;
     const twoCol = n > 4;
     const per = twoCol ? Math.ceil(n / 2) : n;
-    const rowH = Math.min(0.45, avail / Math.max(per, 1));
-    const tblW = twoCol ? 8.45 : 13.2;
-    const colR = twoCol ? [0.13, 0.36, 0.31, 0.20] : [0.12, 0.38, 0.29, 0.21];   // สัดส่วนความกว้างคอลัมน์
-    const colW = colR.map(function (r) { return r * tblW; });
-    // ขนาดตัวอักษร: ตามความสูงแถว แล้วลดลงถ้าข้อความยาวเกินคอลัมน์ (ประมาณความกว้างตัวอักษร ~0.56 เท่าของขนาด)
-    const visLen = function (s) { return String(s).replace(/[ัิ-ฺ็-๎]/g, '').length; };
-    let size = Math.min(twoCol ? 14 : 18, rowH * 72 * 0.6);
-    rowsL.forEach(function (r) {
-      r.forEach(function (t, ci) {
-        const need = visLen(t) * 0.56 / 72;              // นิ้วต่อ 1pt
-        const fit = (colW[ci] - 0.15) / need;
-        if (fit < size) size = fit;
-      });
+    const rowH = Math.min(0.42, avail / Math.max(per, 1));
+    const colW = twoCol ? 8.5 : 17.3;
+    // ขนาดตัวอักษร: ตามความสูงแถว แล้วลดลงถ้าบรรทัดยาวเกินกรอบ
+    let size = Math.min(twoCol ? 13 : 15, rowH * 72 * 0.6);
+    rowsL.forEach(function (t) {
+      const fit = (colW - 0.3) / textWidthIn(t, 1);
+      if (fit < size) size = fit;
     });
     size = Math.max(9, Math.round(size * 2) / 2);
-    const x0s = twoCol ? [2.45, 11.25] : [2.4 + (17.3 - tblW) / 2];
+    const x0s = twoCol ? [2.4, 11.2] : [2.4];
     const bandY = top + (avail - per * rowH) / 2;
+    // ทั้งกลุ่มอยู่กลางคอลัมน์ แต่ทุกบรรทัดเริ่มที่แนวเดียวกัน (ชิดซ้ายตามบรรทัดที่ยาวที่สุดของฝั่งนั้น)
     x0s.forEach(function (x0, side) {
-      rowsL.slice(side * per, side * per + per).forEach(function (r, i) {
-        const y = bandY + i * rowH;
-        if (i % 2 === 0) els.push({ type: 'rect', x: x0, y: y, w: tblW, h: rowH, fill: 'E6EEF8', radius: 0.05 });
-        let cx = x0;
-        r.forEach(function (t, ci) {
-          const w = colW[ci];
-          els.push({ type: 'text', x: cx + (ci === 0 ? 0.1 : 0.05), y: y, w: w - (ci === 3 ? 0.12 : 0.1), h: rowH, text: t, size: size,
-            bold: ci === 0 || ci === 3, color: ci === 0 ? NAVY : INK, align: ci === 3 ? 'right' : 'left', valign: 'middle', inset: 0 });
-          cx += w;
-        });
+      const part = rowsL.slice(side * per, side * per + per);
+      const widest = part.reduce(function (m, t) { return Math.max(m, textWidthIn(t, size)); }, 0);
+      const bw = Math.min(colW, widest + 0.1);
+      const bx = x0 + (colW - bw) / 2;
+      part.forEach(function (t, i) {
+        els.push({ type: 'text', x: bx, y: bandY + i * rowH, w: bw, h: rowH, text: t, size: size, color: INK, align: 'left', valign: 'middle', inset: 0, wrap: false });
       });
     });
     if (twoCol) els.push({ type: 'rect', x: 11.05, y: bandY, w: 0.02, h: per * rowH, fill: 'B8C4D6' });
     // เส้นคั่นก่อนยอดรวม
     els.push({ type: 'line', x: 6.4, y: 3.02, w: 9.3, color: 'B8C4D6', lineW: 0.75 });
     els.push({ type: 'text', x: 2.4, y: 3.05, w: 17.3, h: 0.5, runs: [
-      { text: 'รวม ' + n + ' รายการ    ', size: 17, color: INK },
-      { text: RE.fmtQty(a.qty) + ' ' + unit, size: 19, bold: true, color: NAVY }], align: 'center', valign: 'middle' });
+      { text: 'รวม   ', size: 16, bold: true, color: INK },
+      { text: RE.fmtQty(a.qty) + ' ' + unit, size: 16, bold: true, color: INK }], align: 'center', valign: 'middle' });
 
     // รูป
     const lay = RE.layout(photos, RE.PHOTO_AREA, 0.1, choice);
@@ -880,6 +882,7 @@
       if (e.lineSpacing) o.lineSpacingMultiple = e.lineSpacing;
       if (e.lineSpacingPt) o.lineSpacing = e.lineSpacingPt;   // ระยะบรรทัดคงที่ (pt)
       if (e.charSpacing) o.charSpacing = e.charSpacing;       // ระยะห่างตัวอักษร (pt)
+      if (e.wrap === false) o.wrap = false;                   // ไม่ตัดขึ้นบรรทัดใหม่
       if (e.glow) o.glow = { size: 12, opacity: 0.85, color: 'FFFFFF' };
       return o;
     };
