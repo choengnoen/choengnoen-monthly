@@ -67,6 +67,21 @@
   function validChoice(c, n) { return n > 0 && c != null && c !== '' && Number(c) < RE.templates(n).length ? Number(c) : null; }
   function photoSpec(p) { return { id: p.id || p.__id, w: p.w, h: p.h, fx: p.fx, fy: p.fy }; }
   function problems() { return S.probDraft || rep().problems || []; }
+  // รายการสไลด์รายรหัสงาน — กลุ่มงาน (21100 – 21600) ที่ติ๊ก "รวมเป็นสไลด์เดียว" ไว้ในรายงานเดือนนี้ (rep().merge)
+  // และมีรหัสย่อย ≥ 2 รหัส จะรวมเป็น 1 สไลด์ (รหัส = รหัสกลุ่ม, ช่องรูป = work:<รหัสกลุ่ม>) ไม่รวมงานที่ไม่ทำสไลด์
+  function slideAggs(aggs) {
+    const mg = rep().merge || {};
+    const shown = aggs.filter(function (a) { return RE.HIDDEN_WORK_CODES.indexOf(a.code) < 0; });
+    const done = {}, out = [];
+    shown.forEach(function (a) {
+      const subs = shown.filter(function (x) { return x.group === a.group; });
+      if (!mg[a.group] || subs.length < 2) { out.push(a); return; }
+      if (done[a.group]) return;
+      done[a.group] = true;
+      out.push(RE.mergeAggs(a.group, subs, unitOf));
+    });
+    return out;
+  }
   async function saveReport(patch) {
     await FBL.set('reports', S.mk, Object.assign({}, patch, { updatedAt: FBL.nowIso(), updatedBy: FBL.user.name }), true);
   }
@@ -297,7 +312,7 @@
     $$('#tabs button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === S.tab); });
     const recs = monthRecords();
     $('#bImport').textContent = recs.length;
-    const aggs = RE.aggregate(recs).filter(function (a) { return RE.HIDDEN_WORK_CODES.indexOf(a.code) < 0; });
+    const aggs = slideAggs(RE.aggregate(recs));
     const missing = aggs.filter(function (a) { return !photosOf('work:' + a.code).length && !(rep().exclude || {})[a.code]; }).length;
     $('#bWork').textContent = missing ? missing + ' ไม่มีรูป' : aggs.length;
     $('#bWork').classList.toggle('warn', !!missing);
@@ -619,7 +634,7 @@
   function workSpec(a) {
     const slot = 'work:' + a.code;
     const ph = photosOf(slot).map(photoSpec);
-    return RE.slideWork(a, unitOf(a.code), ph, validChoice((rep().layouts || {})[slot], ph.length));
+    return RE.slideWork(a, a.merged ? '' : unitOf(a.code), ph, validChoice((rep().layouts || {})[slot], ph.length));
   }
   // ช่องหน่วยนับ: มีหลายหน่วยในฐานข้อมูลกลาง = เลือกจากรายการ · หน่วยเดียว = แสดงอย่างเดียว
   // อ่านฐานข้อมูลกลางไม่ได้ / ไม่มีรหัสนี้ = พิมพ์เองได้ (สำรอง)
@@ -641,26 +656,45 @@
   function renderWork() {
     const p = $('[data-panel="work"]');
     const aggs = RE.aggregate(monthRecords());
-    const shown = aggs.filter(function (a) { return RE.HIDDEN_WORK_CODES.indexOf(a.code) < 0; });
+    const shown = slideAggs(aggs);
     const hidden = aggs.filter(function (a) { return RE.HIDDEN_WORK_CODES.indexOf(a.code) >= 0; });
     if (!aggs.length) { p.innerHTML = '<div class="card empty"><h2>ยังไม่มีข้อมูลผลงานของเดือนนี้</h2><p>ไปที่แท็บ ① นำเข้าข้อมูล ก่อน</p></div>'; return; }
     const ex = rep().exclude || {};
+    const mg = rep().merge || {};
+    // กลุ่มงานที่เดือนนี้มีรหัสย่อย ≥ 2 รหัส = เลือกรวมเป็นสไลด์เดียวได้
+    const mergeable = RE.GROUPS.map(function (g) {
+      return { g: g, subs: aggs.filter(function (a) { return a.group === g.code && RE.HIDDEN_WORK_CODES.indexOf(a.code) < 0; }) };
+    }).filter(function (x) { return x.subs.length >= 2; });
     let h = '<div class="card"><div class="row"><h2 style="flex:1">รายรหัสงาน · ' + shown.length + ' สไลด์</h2>' +
       '<span class="muted small">ลากรูปมาวางในแต่ละรหัสงาน ระบบจัดวาง ครอป และเรียงตามเวลาถ่ายให้อัตโนมัติ · คลิกรูปเพื่อเลือกจุดกึ่งกลาง</span></div>' +
+      (mergeable.length ? '<div style="margin:10px 0 0"><b class="small">รวมรหัสย่อยเป็นสไลด์เดียว (ตามกลุ่มงาน)</b>' +
+        mergeable.map(function (x) {
+          return '<div class="small" style="margin-top:4px"><label><input type="checkbox" data-merge="' + x.g.code + '"' + (mg[x.g.code] ? ' checked' : '') + '> ' +
+            '<b>' + x.g.code + '</b> ' + esc(RE.groupName(x.g.code)) + ' — รวม ' + x.subs.map(function (a) { return a.code; }).join(', ') + ' (' + x.subs.length + ' สไลด์ → 1 สไลด์)</label></div>';
+        }).join('') +
+        '<p class="small muted" style="margin:4px 0 0">สไลด์รวมแสดงรายสายทางของทุกรหัสย่อย (ขึ้นต้นบรรทัดด้วยรหัสงาน) และรวมค่าใช้จ่าย · ถ้าหน่วยนับต่างกัน จะแสดงปริมาณแยกตามหน่วย และไม่คิด Unit Cost · รูปของสไลด์รวมแยกจากรูปรายรหัส</p></div>' : '') +
       (hidden.length ? '<p class="small muted" style="margin:8px 0 0">ไม่ทำสไลด์: ' + hidden.map(function (a) { return a.code + ' ' + esc(a.name.slice(0, 40)); }).join(', ') + ' (งานบริหาร — ยังนับในยอดรวม กราฟ และแผน-ผล)</p>' : '') + '</div>';
     shown.forEach(function (a) {
       const slot = 'work:' + a.code;
       const spec = workSpec(a);
       const n = photosOf(slot).length;
-      h += '<div class="card" id="w-' + a.code + '"><div class="card-head"><h3>รหัส ' + a.code + ' ' + esc(a.name) + '</h3><div class="sp"></div>' +
+      const unitHtml = a.merged
+        ? a.subs.map(function (c) { return '<div class="row" style="margin-bottom:4px"><div style="width:70px" class="small"><b>' + c + '</b></div><div style="width:130px">' + unitFieldHtml(c) + '</div></div>' + unitNoteHtml(c); }).join('') +
+          '<div class="muted small">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + ' รายการสายทาง</div>'
+        : '<div class="row"><div style="width:130px"><label class="f">หน่วยนับ</label>' + unitFieldHtml(a.code) + '</div>' +
+          '<div class="muted small" style="flex:1">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + ' สายทาง</div></div>' + unitNoteHtml(a.code);
+      const qtyTxt = a.merged ? a.qtyParts.map(function (q) { return RE.fmtQty(q.qty) + ' ' + esc(q.unit); }).join(' + ') : RE.fmtQty(a.qty) + ' ' + esc(unitOf(a.code));
+      const ucTxt = a.merged ? (a.sameUnit ? RE.fmt(a.unitCost) + ' บาท/' + esc(a.qtyParts[0].unit) : '- (หน่วยนับต่างกัน)') : RE.fmt(a.unitCost) + ' บาท/' + esc(unitOf(a.code));
+      // รูปที่อยู่ในสไลด์รายรหัสย่อยเดิม — ดึงมาใช้ในสไลด์รวมได้
+      const subPh = a.merged ? a.subs.reduce(function (s, c) { return s.concat(photosOf('work:' + c)); }, []) : [];
+      h += '<div class="card" id="w-' + a.code + '"><div class="card-head"><h3>รหัส ' + a.code + ' ' + esc(a.name) + (a.merged ? ' <span class="pill info">รวม ' + a.subs.join(', ') + '</span>' : '') + '</h3><div class="sp"></div>' +
         (ex[a.code] ? '<span class="pill info">ไม่ใส่ในไฟล์</span>' : n ? '<span class="pill ok">' + n + ' รูป</span>' : '<span class="pill warn">ยังไม่มีรูป</span>') +
         '<label class="small"><input type="checkbox" data-excl="' + a.code + '"' + (ex[a.code] ? ' checked' : '') + '> ไม่ใส่สไลด์นี้</label></div>' +
         '<div class="work"><div data-prev="' + a.code + '">' + slideHtml(spec) + '</div><div>' +
-        '<div class="row"><div style="width:130px"><label class="f">หน่วยนับ</label>' + unitFieldHtml(a.code) + '</div>' +
-        '<div class="muted small" style="flex:1">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + ' สายทาง</div></div>' +
-        unitNoteHtml(a.code) +
-        '<div class="kv" style="margin:12px 0"><div>ปริมาณรวม</div><div>' + RE.fmtQty(a.qty) + ' ' + esc(unitOf(a.code)) + '</div><div>ค่าใช้จ่ายรวม</div><div><b>' + RE.fmt(a.total) + '</b> บาท</div>' +
-        '<div>Unit Cost</div><div>' + RE.fmt(a.unitCost) + ' บาท/' + esc(unitOf(a.code)) + '</div></div>' +
+        unitHtml +
+        '<div class="kv" style="margin:12px 0"><div>ปริมาณรวม</div><div>' + qtyTxt + '</div><div>ค่าใช้จ่ายรวม</div><div><b>' + RE.fmt(a.total) + '</b> บาท</div>' +
+        '<div>Unit Cost</div><div>' + ucTxt + '</div></div>' +
+        (subPh.length && n < RE.MAX_PHOTOS ? '<button class="btn btn-sm" style="margin-bottom:8px" data-pullsub="' + a.code + '">ดึงรูปจากสไลด์รายรหัสย่อย (' + subPh.length + ' รูป)</button>' : '') +
         '<div class="drop small" data-pdrop="' + slot + '"><b>+ เพิ่มรูป</b> ลากมาวาง หรือคลิกเลือก (แนะนำ 4 รูป สูงสุด 6)</div>' +
         thumbsHtml(slot) + layoutSelectHtml(slot, n, spec.layout) + '</div></div></div>';
     });
@@ -672,6 +706,27 @@
     $$('[data-pdrop]', p).forEach(function (d) { bindDrop(d, 'image/*', true, function (files) { addPhotos(files, d.getAttribute('data-pdrop')); }); });
     $$('[data-excl]', p).forEach(function (c) {
       c.onchange = function () { const e2 = Object.assign({}, rep().exclude || {}); e2[c.getAttribute('data-excl')] = c.checked; run(function () { return saveReport({ exclude: e2 }); }); };
+    });
+    $$('[data-merge]', p).forEach(function (c) {
+      c.onchange = function () {
+        const m2 = Object.assign({}, rep().merge || {});
+        m2[c.getAttribute('data-merge')] = c.checked;
+        run(function () { return saveReport({ merge: m2 }); }, c.checked ? 'รวมเป็นสไลด์เดียวแล้ว' : 'แยกสไลด์รายรหัสแล้ว');
+      };
+    });
+    // ย้ายรูปจากสไลด์รายรหัสย่อยมาไว้สไลด์รวม (ตามลำดับเดิม ไม่เกินจำนวนรูปสูงสุด)
+    $$('[data-pullsub]', p).forEach(function (b) {
+      b.onclick = function () {
+        const a = shown.find(function (x) { return x.code === b.getAttribute('data-pullsub'); });
+        if (!a) return;
+        const slot = 'work:' + a.code, cur = photosOf(slot);
+        const room = RE.MAX_PHOTOS - cur.length;
+        const src = a.subs.reduce(function (s, c) { return s.concat(photosOf('work:' + c)); }, []).slice(0, room);
+        if (!src.length) return;
+        let order = cur.reduce(function (m, x) { return Math.max(m, x.order || 0); }, 0);
+        const ops = src.map(function (x) { return { op: 'set', col: 'photos', id: x.__id, data: { slot: slot, order: ++order }, merge: true }; });
+        run(function () { return FBL.commit(ops); }, 'ย้ายรูปมาไว้สไลด์รวมแล้ว ' + src.length + ' รูป');
+      };
     });
     $$('[data-unit]', p).forEach(function (inp) {
       inp.onchange = function () {
@@ -943,8 +998,8 @@
     const plan = planOf(fy);
     const cum = RE.cumulative(plan || {}, S.records, S.mk);
     const specs = [coverSpec()];
-    aggs.forEach(function (a) {
-      if (RE.HIDDEN_WORK_CODES.indexOf(a.code) >= 0 || (r.exclude || {})[a.code]) return;
+    slideAggs(aggs).forEach(function (a) {
+      if ((r.exclude || {})[a.code]) return;
       specs.push(workSpec(a));
     });
     if (aggs.length) specs.push(RE.slideMonthSummary(S.mk, aggs));
@@ -961,7 +1016,7 @@
     const p = $('[data-panel="export"]');
     const r = rep();
     const recs = monthRecords();
-    const aggs = RE.aggregate(recs).filter(function (a) { return RE.HIDDEN_WORK_CODES.indexOf(a.code) < 0 && !(r.exclude || {})[a.code]; });
+    const aggs = slideAggs(RE.aggregate(recs)).filter(function (a) { return !(r.exclude || {})[a.code]; });
     const noPhoto = aggs.filter(function (a) { return !photosOf('work:' + a.code).length; });
     const fy = RE.fyOf(S.mk);
     const plan = planOf(fy);

@@ -319,10 +319,14 @@
   };
 
   /* ---------------- สรุปตามรหัสงาน ---------------- */
+  // ชื่องานแบบย่อ (ใช้แทนชื่อเต็มจากไฟล์ CSV ที่ยาวเกินไปบนสไลด์/ตาราง)
+  RE.SHORT_NAMES = {
+    '21422': 'งานบำรุงรักษา ราวกันอันตราย ฯลฯ'
+  };
   RE.aggregate = function (records) {
     const by = {};
     records.forEach(function (r) {
-      const a = by[r.code] = by[r.code] || { code: r.code, name: r.name, group: r.group, qty: 0, days: 0, mat: 0, lab: 0, rent: 0, fuel: 0, total: 0, count: 0, lineMap: {}, records: [] };
+      const a = by[r.code] = by[r.code] || { code: r.code, name: RE.SHORT_NAMES[r.code] || r.name, group: r.group, qty: 0, days: 0, mat: 0, lab: 0, rent: 0, fuel: 0, total: 0, count: 0, lineMap: {}, records: [] };
       a.qty += r.qty; a.days += r.days; a.mat += r.mat; a.lab += r.lab; a.rent += r.rent; a.fuel += r.fuel; a.total += r.total; a.count++;
       a.records.push(r);
       const k = r.route + '/' + r.ctrl;
@@ -342,6 +346,44 @@
       return a;
     });
   };
+  /* ---------------- รวมรหัสย่อยเป็นสไลด์เดียวตามกลุ่มงาน (21100 – 21600) ----------------
+     subs: ผลสรุปรายรหัส (จาก RE.aggregate) ที่อยู่ในกลุ่มเดียวกัน, unitOf(code) → หน่วยนับ
+     คืนผลสรุปแบบเดียวกับรหัสเดียว + merged, subs, units (หน่วยนับของแต่ละรหัส), qtyParts (ปริมาณรวมแยกตามหน่วย) */
+  RE.groupName = function (gcode) {
+    try {
+      if (window.CNMaster && CNMaster.findWorkCode) {
+        const wc = CNMaster.findWorkCode(gcode);
+        if (wc && wc.name) return String(wc.name).trim();
+      }
+    } catch (e) { /* ใช้ชื่อสำรอง */ }
+    const g = RE.GROUPS.find(function (x) { return x.code === gcode; });
+    return g ? g.name : '';
+  };
+  RE.mergeAggs = function (gcode, subs, unitOf) {
+    const m = { code: gcode, name: RE.groupName(gcode), group: gcode, merged: true, subs: subs.map(function (a) { return a.code; }),
+      qty: 0, days: 0, mat: 0, lab: 0, rent: 0, fuel: 0, total: 0, count: 0, records: [], lines: [], units: {} };
+    const byUnit = {};
+    subs.forEach(function (a) {
+      const u = unitOf(a.code);
+      m.units[a.code] = u;
+      ['days', 'mat', 'lab', 'rent', 'fuel', 'total', 'count'].forEach(function (k) { m[k] += a[k]; });
+      m.records = m.records.concat(a.records);
+      a.lines.forEach(function (L) { m.lines.push(Object.assign({ code: a.code, unit: u }, L)); });
+      byUnit[u] = byUnit[u] || { unit: u, qty: 0, days: 0 };
+      byUnit[u].qty += a.qty; byUnit[u].days += a.days;
+    });
+    // เรียงรายสายทางให้สายเดียวกันอยู่ติดกัน แล้วตาม กม. และรหัสงาน
+    m.lines.sort(function (x, y) { return (parseFloat(x.route) - parseFloat(y.route)) || (x.fromM - y.fromM) || x.code.localeCompare(y.code); });
+    ['mat', 'lab', 'rent', 'fuel', 'total'].forEach(function (k) { m[k] = round2(m[k]); });
+    m.qtyParts = Object.keys(byUnit).map(function (u) { return { unit: u, qty: round2(byUnit[u].qty), days: byUnit[u].days }; });
+    // หน่วยเดียวกันทั้งกลุ่ม = คิด Unit Cost / ผลงานเฉลี่ยได้ · หลายหน่วย = บวกปริมาณข้ามหน่วยไม่ได้
+    m.sameUnit = m.qtyParts.length === 1;
+    m.qty = m.sameUnit ? m.qtyParts[0].qty : 0;
+    m.unitCost = m.sameUnit && m.qty ? m.total / m.qty : 0;
+    m.perDay = m.sameUnit && m.days ? m.qty / m.days : 0;
+    return m;
+  };
+
   RE.sumBy = function (records, key) { return round2(records.reduce(function (s, r) { return s + (Number(r[key]) || 0); }, 0)); };
 
   /* ---------------- แผน-ผลสะสม ---------------- */
@@ -630,11 +672,12 @@
     //   "ทล.3139   ตอน บ้านแลง – หาดใหญ่   กม. 12+000 - กม. 13+000   ( 400 ตร.ม. )"
     // ≤ 4 สาย: คอลัมน์เดียวกลางสไลด์ / มากกว่านั้น: แบ่ง 2 ฝั่งซ้าย-ขวา มีเส้นคั่นกลาง
     const SP = '   ';
+    // สไลด์รวมกลุ่มงาน: ขึ้นต้นบรรทัดด้วยรหัสย่อย และใช้หน่วยนับของรหัสนั้น
     const rowsL = a.lines.map(function (L) {
       const sec = RE.sectionName(L.route, L.ctrl, L.fromM);
-      return 'ทล.' + L.route + SP + (/^ตอน/.test(sec) ? sec : 'ตอน ' + sec) + SP +
+      return (a.merged ? L.code + SP : '') + 'ทล.' + L.route + SP + (/^ตอน/.test(sec) ? sec : 'ตอน ' + sec) + SP +
         ((L.fromM === L.toM) ? 'กม. ' + RE.mToKm(L.fromM) : 'กม. ' + RE.mToKm(L.fromM) + ' - กม. ' + RE.mToKm(L.toM)) + SP +
-        '( ' + RE.fmtQty(L.qty) + ' ' + unit + ' )';
+        '( ' + RE.fmtQty(L.qty) + ' ' + (L.unit || unit) + ' )';
     });
     const n = rowsL.length;
     const top = 1.6, avail = 1.36;
@@ -655,8 +698,10 @@
     x0s.forEach(function (x0, side) {
       const part = rowsL.slice(side * per, side * per + per);
       const widest = part.reduce(function (m, t) { return Math.max(m, textWidthIn(t, size)); }, 0);
-      const bw = Math.min(colW, widest + 0.1);
-      const bx = x0 + (colW - bw) / 2;
+      // เผื่อความกว้าง ~10% — ค่าที่วัดได้อาจแคบกว่าที่แสดงจริง (ฟอนต์ยังโหลดไม่เสร็จ / PowerPoint วาดกว้างกว่า)
+      // ไม่งั้นท้ายบรรทัด เช่น " )" จะถูกตัดหาย — กล่องชิดซ้าย จึงขยายไปทางขวาได้โดยตัวอักษรไม่เลื่อน
+      const bw = Math.min(colW, widest * 1.1 + 0.3);
+      const bx = x0 + (colW - Math.min(colW, widest + 0.1)) / 2;
       part.forEach(function (t, i) {
         els.push({ type: 'text', x: bx, y: bandY + i * rowH, w: bw, h: rowH, text: t, size: size, color: INK, align: 'left', valign: 'middle', inset: 0, wrap: false });
       });
@@ -666,7 +711,7 @@
     els.push({ type: 'line', x: 6.4, y: 3.02, w: 9.3, color: 'B8C4D6', lineW: 0.75 });
     els.push({ type: 'text', x: 2.4, y: 3.05, w: 17.3, h: 0.5, runs: [
       { text: 'รวม   ', size: 16, bold: true, color: INK },
-      { text: RE.fmtQty(a.qty) + ' ' + unit, size: 16, bold: true, color: INK }], align: 'center', valign: 'middle' });
+      { text: a.qtyParts ? a.qtyParts.map(function (q) { return RE.fmtQty(q.qty) + ' ' + q.unit; }).join('  +  ') : RE.fmtQty(a.qty) + ' ' + unit, size: 16, bold: true, color: INK }], align: 'center', valign: 'middle' });
 
     // รูป
     const lay = RE.layout(photos, RE.PHOTO_AREA, 0.1, choice);
@@ -694,12 +739,15 @@
       els.push(tx({ x: 16.2, y: valY[i], w: 2.518, h: 0.4, text: RE.fmt(r[1]) + '  บาท', align: 'right' }));
       els.push({ type: 'line', x: 14.013, y: lineY[i], w: 4.942, color: '444444', lineW: 0.75 });
     });
-    const perDayTxt = a.perDay >= 100 ? RE.fmt(a.perDay, 0) : RE.fmt(a.perDay, 2);
+    // สไลด์รวมที่มีหลายหน่วยนับ: Unit Cost / ผลงานเฉลี่ย คิดรวมไม่ได้ → แสดง "-"
+    const noRate = a.merged && !a.sameUnit;
+    if (a.merged && a.sameUnit) unit = a.qtyParts[0].unit;
+    const perDayTxt = noRate ? '-' : a.perDay >= 100 ? RE.fmt(a.perDay, 0) : RE.fmt(a.perDay, 2);
     // [หัวข้อ, ค่า, หน่วย, สีค่า, y หัวข้อ, y ค่า, y หน่วย, x หน่วย, หน่วยตัวหนา+เอียง]
     const tot = [
       ['รวม', RE.fmt(a.total), 'บาท', BLK, 7.884, 7.892, 7.875, 17.73, true],
-      ['Unit Cost', RE.fmt(a.unitCost), 'บาท/' + unit, RED, 8.371, 8.378, 8.378, 17.73, false],
-      ['ผลงานเฉลี่ย', perDayTxt, unit + '/วัน', RED, 8.871, 8.868, 8.869, 17.734, false]
+      ['Unit Cost', noRate ? '-' : RE.fmt(a.unitCost), noRate ? '' : 'บาท/' + unit, RED, 8.371, 8.378, 8.378, 17.73, false],
+      ['ผลงานเฉลี่ย', perDayTxt, noRate ? '' : unit + '/วัน', RED, 8.871, 8.868, 8.869, 17.734, false]
     ];
     els.push({ type: 'ellipse', x: 13.898, y: 7.784, w: 0.5, h: 0.5, fill: 'FAC02E', line: 'E09A00', lineW: 1.5, text: '★', size: 15, bold: true, color: 'FFFFFF' });
     tot.forEach(function (t) {
@@ -707,7 +755,7 @@
       els.push(tx({ x: 15.2, y: t[5], w: 2.268, h: 0.4, text: t[1], bold: true, color: t[3], align: 'right' }));
       els.push(tx({ x: t[7], y: t[6], w: 1.6, h: 0.4, text: t[2], bold: t[8], italic: t[8] }));
     });
-    return { kind: 'work', title: a.code + ' ' + a.name, els: els, layout: lay };
+    return { kind: 'work', title: a.code + ' ' + a.name + (a.merged ? ' (รวม ' + a.subs.join(', ') + ')' : ''), els: els, layout: lay };
   };
 
   // สรุปผลงานประจำเดือน (กราฟวงกลม 2 รูป) — ใช้กรอบเมนู "รายงานผลการปฏิบัติงาน" ตามต้นฉบับ
