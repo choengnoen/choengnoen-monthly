@@ -888,6 +888,19 @@
     return { kind: 'problem', title: tt[0], els: els, layouts: layouts };
   };
 
+  // ตรากรมขนาดเล็กมุมซ้ายบน — อยู่ในภาพกรอบทุกแบบ (วัดจากภาพ 1920×1080: กลาง 123.5,84.5 px กว้าง ~101 px)
+  // มีตราที่อัปโหลด: ปิดตราเดิมด้วยวงกลมสีพื้นของกรอบ แล้ววางตราใหม่ทับ (ใส่ต่อจากพื้นหลัง ให้อยู่ใต้ชิ้นอื่น)
+  const FRAME_LOGO_BG = { 'frame-title.jpg': 'F5FAFF', 'frame-end.jpg': 'F5FAFF' };   // นอกนั้นแถบเมนูสีน้ำเงิน
+  RE.withLogo = function (spec, logo) {
+    if (!logo || !spec.els.length || spec.els[0].type !== 'bg') return spec;
+    const fill = FRAME_LOGO_BG[spec.els[0].src.replace(/^.*\//, '')] || '010A81';
+    const els = spec.els.slice();
+    els.splice(1, 0,
+      { type: 'ellipse', x: 0.724, y: 0.318, w: 1.125, h: 1.125, fill: fill },
+      { type: 'image', src: logo, x: 0.7605, y: 0.354, w: 1.052, h: 1.052 });
+    return Object.assign({}, spec, { els: els });
+  };
+
   RE.slideEnd = function () {
     return { kind: 'end', title: 'จบการนำเสนอ', els: [{ type: 'bg', src: A('frame-end.jpg') }] };
   };

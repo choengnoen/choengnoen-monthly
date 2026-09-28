@@ -144,6 +144,7 @@
     return '<svg viewBox="0 0 100 60" width="100%" height="100%" preserveAspectRatio="none">' + out + '</svg>';
   }
   function slideHtml(spec) {
+    spec = RE.withLogo(spec, settings().logo);   // ตรามุมซ้ายบนของกรอบ (ถ้าอัปโหลดตราไว้)
     const thumbs = {};
     S.photos.forEach(function (p) { thumbs[p.__id] = p.thumb; });
     let h = '';
@@ -778,7 +779,7 @@
     const info = st.logo
       ? 'ใช้ตราที่อัปโหลด' + (st.logoName ? ' (' + esc(st.logoName) + ')' : '') + (st.logoBy ? '<br>โดย ' + esc(st.logoBy) : '')
       : 'ใช้ตราเดิม (จากรายงานเดือน มิ.ย. 69)';
-    let h = '<label class="f" style="margin-top:14px">ตรากรมทางหลวง (ใช้กับหน้าปกทุกเดือน)</label>' +
+    let h = '<label class="f" style="margin-top:14px">ตรากรมทางหลวง (หน้าปก + มุมซ้ายบนทุกสไลด์ ใช้ทุกเดือน)</label>' +
       '<div class="row" style="align-items:center;gap:10px;flex-wrap:nowrap">' + img + '<div class="small muted">' + info + '</div></div>';
     if (!FBL.isPrivileged()) return h + '<p class="small muted">เปลี่ยนตราได้เฉพาะเจ้าของระบบหรือผู้ดูแลระบบ</p>';
     h += '<div class="drop small" id="logoDrop" style="margin-top:8px"><b>อัปโหลดตรากรมทางหลวง</b> — ลากไฟล์มาวาง หรือคลิกเลือก (แนะนำ PNG พื้นโปร่งใส)</div>';
@@ -791,7 +792,7 @@
     run(async function () {
       const d = await logoDataUrl(f);
       await FBL.set('config', 'settings', { logo: d, logoName: f.name, logoAt: FBL.nowIso(), logoBy: FBL.user.name }, true);
-    }, 'บันทึกตรากรมทางหลวงแล้ว — ใช้กับหน้าปกทุกเดือน');
+    }, 'บันทึกตรากรมทางหลวงแล้ว — ใช้กับทุกสไลด์ทุกเดือน');
   }
   function problemSpecs(pr) {
     const pts = pr.points || [];
@@ -1117,7 +1118,8 @@
         $('#expTxt').textContent = 'กำลังโหลดรูป ' + ids.length + ' รูปจาก Google Drive…';
         await FBL.prefetchPhotos(ids);
       }
-      const pptx = await RE.buildPptx(specs, FBL.photoBytes, function (msg) {
+      const logo = settings().logo;
+      const pptx = await RE.buildPptx(specs.map(function (s) { return RE.withLogo(s, logo); }), FBL.photoBytes, function (msg) {
         step++; bar.style.width = Math.min(95, step / specs.length * 95) + '%'; $('#expTxt').textContent = msg;
       });
       $('#expTxt').textContent = 'กำลังรวมไฟล์…';
