@@ -154,13 +154,19 @@
     S.photos.forEach(function (p) { thumbs[p.__id] = p.thumb; });
     let h = '';
     let bg = '';
+    // ขอบนุ่มของรูป (ไล่เป็นสีขาว) — แบบเดียวกับที่ใส่ในไฟล์ PowerPoint
+    const softCss = function (e) { return e.soft ? 'box-shadow:inset 0 0 ' + (e.soft / W * 100) + 'cqw ' + (e.soft / W * 50) + 'cqw #fff;' : ''; };
     spec.els.forEach(function (e) {
       if (e.type === 'bg') bg = 'background:url(' + e.src + ') center/100% 100% no-repeat;';
       else if (e.type === 'image') {
-        h += e.pw ? '<div style="' + pos(e) + photoBg(e.src, e.pw, e.ph, Object.assign({ fx: .5, fy: .5 }, e)) + '"></div>'
+        h += e.pw ? '<div style="' + pos(e) + photoBg(e.src, e.pw, e.ph, Object.assign({ fx: .5, fy: .5 }, e)) + softCss(e) + '"></div>'
           : '<img src="' + e.src + '" style="' + pos(e) + '" alt="">';
       } else if (e.type === 'photo') {
-        h += '<div class="el-photo" data-photo="' + esc(e.id) + '" title="คลิกเพื่อเลือกจุดกึ่งกลางของรูป" style="cursor:pointer;' + pos(e) + photoBg(thumbs[e.id] || '', e.pw, e.ph, e) + '"></div>';
+        h += '<div class="el-photo" data-photo="' + esc(e.id) + '" title="คลิกเพื่อเลือกจุดกึ่งกลางของรูป" style="cursor:pointer;' + pos(e) + photoBg(thumbs[e.id] || '', e.pw, e.ph, e) + softCss(e) + '"></div>';
+      } else if (e.type === 'softbox') {
+        const b = e.blur / W * 100;
+        h += '<div style="left:' + ((e.x + e.blur) / W * 100) + '%;top:' + ((e.y + e.blur) / H * 100) + '%;width:' + ((e.w - 2 * e.blur) / W * 100) + '%;height:' + ((e.h - 2 * e.blur) / H * 100) + '%;' +
+          'background:rgba(255,255,255,' + e.opacity + ');box-shadow:0 0 ' + b + 'cqw ' + (b / 2) + 'cqw rgba(255,255,255,' + e.opacity + ');filter:blur(' + (b / 2) + 'cqw)"></div>';
       } else if (e.type === 'placeholder') {
         h += '<div class="el-ph" style="' + pos(e) + 'font-size:1.3cqw">' + esc(e.text) + '</div>';
       } else if (e.type === 'text') h += textHtml(e);
@@ -1019,15 +1025,17 @@
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 3: ความก้าวหน้าการใช้งบประมาณ</h3><div id="planPrev2"></div>' +
       '<div class="drop small" style="margin-top:10px" data-pdrop-budget="1"><b>+ เพิ่มรูปกราฟ</b> — แคปกราฟจากระบบของกรมแล้วลากมาวาง หรือคลิกเลือก (รูปใหม่จะแทนรูปเดิม)</div>' +
       (photosOf('budget').length ? thumbsHtml('budget') : '') +
-      '<label class="f" style="margin-top:12px">ข้อความใต้กราฟ บรรทัดที่ 1 (ระบบอ่านจากรูปให้ แก้ได้)</label><input type="text" id="budgetLine1" value="' + esc(rep().budgetLine1 || '') + '">' +
-      '<label class="f" style="margin-top:8px">บรรทัดที่ 2</label><input type="text" id="budgetLine2" value="' + esc(rep().budgetLine2 || '') + '">' +
+      '<p class="small muted" style="margin-top:12px">ข้อความใต้กราฟ: ยอดเงินแผน/ผล มาจากตาราง "แผนและผลตามกลุ่มงาน" ด้านบน · % แผน/ผลสะสม ระบบอ่านจากรูปกราฟให้ (แก้ได้)</p>' +
+      '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
+      '<div><label class="f">% แผนสะสม (จากกราฟ)</label><input type="text" inputmode="decimal" id="budgetPctPlan" style="width:140px" value="' + esc(budgetPct().plan) + '"></div>' +
+      '<div><label class="f">% ผลสะสม (จากกราฟ)</label><input type="text" inputmode="decimal" id="budgetPctResult" style="width:140px" value="' + esc(budgetPct().result) + '"></div></div>' +
       '</div>';
     p.innerHTML = h;
     bindThumbs(p);
     bindDrop($('[data-pdrop-budget]', p), 'image/*', false, addBudgetImage);
-    const saveLines = debounce(function () { run(function () { return saveReport({ budgetLine1: $('#budgetLine1').value.trim(), budgetLine2: $('#budgetLine2').value.trim() }); }); }, 700);
-    $('#budgetLine1').addEventListener('input', saveLines);
-    $('#budgetLine2').addEventListener('input', saveLines);
+    const savePct = debounce(function () { run(function () { return saveReport({ budgetPct: budgetPct() }); }); }, 700);
+    $('#budgetPctPlan').addEventListener('input', savePct);
+    $('#budgetPctResult').addEventListener('input', savePct);
     renderPlanPreview();
     p.oninput = function () { renderPlanPreview(); };
     $('#carryMk').onchange = function () {
@@ -1074,10 +1082,11 @@
     run(function () { return FBL.set('plans', String(fy), Object.assign(d, { fy: fy, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name })); }, 'อัปเดตแผน-ผลจากไฟล์แล้ว').then(renderPlan);
   }
   function budgetImg() { const b = photosOf('budget')[0]; return b ? photoSpec(b) : null; }
-  // ข้อความ 2 บรรทัดใต้กราฟ (เก็บในรายงานของเดือน) — ช่องที่กำลังแก้อยู่มาก่อนค่าที่บันทึกไว้
-  function budgetLines() {
-    const r = rep();
-    return [$('#budgetLine1') ? $('#budgetLine1').value : (r.budgetLine1 || ''), $('#budgetLine2') ? $('#budgetLine2').value : (r.budgetLine2 || '')];
+  // % แผน/ผลสะสมจากรูปกราฟ (เก็บในรายงานของเดือน เป็นข้อความตามที่พิมพ์) — ช่องที่กำลังแก้อยู่มาก่อนค่าที่บันทึกไว้
+  function budgetPct() {
+    const r = rep().budgetPct || {};
+    const val = function (id, v) { return $(id) ? $(id).value.replace(/[,%\s]/g, '') : (v == null ? '' : String(v)); };
+    return { plan: val('#budgetPctPlan', r.plan), result: val('#budgetPctResult', r.result) };
   }
   // ใส่รูปกราฟ: บันทึกรูป + อ่าน % แผน/ผลจากรูปแล้วกรอก 2 บรรทัดให้ (อ่านจากไฟล์ต้นฉบับที่คมกว่ารูปที่ย่อแล้ว)
   function addBudgetImage(files) {
@@ -1088,9 +1097,9 @@
     RE.readBudgetChart(f).then(function (v) {
       t.remove();
       if (!v) { toast('อ่านตัวเลข % แผน/ผล จากรูปไม่ได้ — พิมพ์ 2 บรรทัดใต้กราฟเองได้', 'err', 7000); return; }
-      const l = RE.budgetLinesFrom(S.mk, v);
-      if ($('#budgetLine1')) { $('#budgetLine1').value = l[0]; $('#budgetLine2').value = l[1]; renderPlanPreview(); }
-      return saveReport({ budgetLine1: l[0], budgetLine2: l[1] }).then(function () {
+      const pv = { plan: RE.fmt(v.plan).replace(/,/g, ''), result: RE.fmt(v.result).replace(/,/g, '') };
+      if ($('#budgetPctPlan')) { $('#budgetPctPlan').value = pv.plan; $('#budgetPctResult').value = pv.result; renderPlanPreview(); }
+      return saveReport({ budgetPct: pv }).then(function () {
         toast('อ่านได้: แผน ' + RE.fmt(v.plan) + '% · ผล ' + RE.fmt(v.result) + '% — ตรวจตัวเลขเทียบกับรูปอีกครั้ง', 'ok', 7000);
       });
     }).catch(function (e) { t.remove(); console.error(e); toast(e.message || String(e), 'err'); });
@@ -1108,7 +1117,7 @@
       $('#planPrev0').innerHTML = aggs.length ? slideHtml(RE.slideMonthSummary(S.mk, aggs)) : '<p class="muted">ยังไม่มีผลงานของเดือน ' + esc(RE.mkLabel(S.mk)) + ' — นำเข้า Export_CSV ในแท็บ ① ก่อน</p>';
     }
     if ($('#planPrev1')) $('#planPrev1').innerHTML = slideHtml(RE.slidePlan(S.mk, plan, cum));
-    if ($('#planPrev2')) $('#planPrev2').innerHTML = slideHtml(RE.slideBudget(S.mk, plan, cum, budgetImg(), budgetLines()));
+    if ($('#planPrev2')) $('#planPrev2').innerHTML = slideHtml(RE.slideBudget(S.mk, plan, cum, budgetImg(), budgetPct()));
   }
 
   /* ======================================================================
@@ -1127,7 +1136,7 @@
     });
     if (aggs.length) specs.push(RE.slideMonthSummary(S.mk, aggs));
     if (plan && cum.planTotal > 0) specs.push(RE.slidePlan(S.mk, plan, cum));
-    if (budgetImg()) specs.push(RE.slideBudget(S.mk, plan || {}, cum, budgetImg(), budgetLines()));
+    if (budgetImg()) specs.push(RE.slideBudget(S.mk, plan || {}, cum, budgetImg(), budgetPct()));
     (r.problems || []).forEach(function (pr) { problemSpecs(pr).forEach(function (s) { specs.push(s); }); });
     specs.push(RE.slideEnd());
     return specs;
