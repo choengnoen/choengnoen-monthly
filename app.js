@@ -298,6 +298,7 @@
 
   // ข้อมูลเปลี่ยนจากเครื่องอื่น: วาดใหม่ แต่ไม่วาดทับช่องที่กำลังพิมพ์อยู่
   const scheduleRender = debounce(function () {
+    if (S.exporting && S.tab === 'export') { scheduleRender(); return; }   // ไม่วาดหน้าใหม่ระหว่างส่งออก (แถบความคืบหน้าจะหาย)
     const ae = document.activeElement;
     const panel = $('[data-panel="' + S.tab + '"]');
     if (ae && panel && panel.contains(ae) && /INPUT|TEXTAREA|SELECT/.test(ae.tagName)) { renderHeader(); refreshPreviews(); return; }
@@ -1195,11 +1196,14 @@
       specs.forEach(function (s) { (s.els || []).forEach(function (e) { if (e.type === 'photo' && ids.indexOf(e.id) < 0) ids.push(e.id); }); });
       if (ids.length && FBL.photoStore === 'drive') {
         $('#expTxt').textContent = 'กำลังโหลดรูป ' + ids.length + ' รูปจาก Google Drive…';
-        await FBL.prefetchPhotos(ids);
+        await FBL.prefetchPhotos(ids, function (n, total) {
+          bar.style.width = Math.round(n / total * 40) + '%';
+          $('#expTxt').textContent = 'กำลังโหลดรูปจาก Google Drive… ' + n + '/' + total + ' รูป';
+        });
       }
       const logo = settings().logo;
       const pptx = await RE.buildPptx(specs.map(function (s) { return RE.withLogo(s, logo); }), FBL.photoBytes, function (msg) {
-        step++; bar.style.width = Math.min(95, step / specs.length * 95) + '%'; $('#expTxt').textContent = msg;
+        step++; bar.style.width = Math.min(95, 40 + step / specs.length * 55) + '%'; $('#expTxt').textContent = msg;
       });
       $('#expTxt').textContent = 'กำลังรวมไฟล์…';
       let name = $('#outName').value.trim() || defaultFileName();

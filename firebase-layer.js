@@ -423,14 +423,18 @@
   const DRIVE = !FBL.demo && /^https:\/\/script\.google\.com\/.+\/exec$/.test(DRIVE_BRIDGE_URL);
   FBL.photoStore = DRIVE ? 'drive' : 'firestore';
 
-  async function bridge(body) {
+  async function bridge(body, timeoutMs) {
     if (!FBL._auth.currentUser) throw new Error('ยังไม่ได้ล็อกอิน');
     body.idToken = await FBL._auth.currentUser.getIdToken();
     let r, j;
-    // text/plain = ไม่ต้องมีคำขอ preflight (Apps Script ไม่รองรับ OPTIONS)
-    try { r = await fetch(DRIVE_BRIDGE_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) }); }
-    catch (e) { throw new Error('เชื่อมต่อ Google Drive ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'); }
-    try { j = await r.json(); } catch (e) { throw new Error('ตัวกลาง Google Drive ตอบกลับผิดรูปแบบ (ตรวจสอบการ Deploy ของ drive-bridge ว่าเลือก Who has access = Anyone)'); }
+    const ac = timeoutMs && window.AbortController ? new AbortController() : null;
+    const tm = ac ? setTimeout(function () { ac.abort(); }, timeoutMs) : null;
+    try {
+      // text/plain = ไม่ต้องมีคำขอ preflight (Apps Script ไม่รองรับ OPTIONS)
+      try { r = await fetch(DRIVE_BRIDGE_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body), signal: ac ? ac.signal : undefined }); }
+      catch (e) { throw new Error(ac && ac.signal.aborted ? 'Google Drive ตอบช้าเกินไป กรุณาลองใหม่' : 'เชื่อมต่อ Google Drive ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'); }
+      try { j = await r.json(); } catch (e) { throw new Error(ac && ac.signal.aborted ? 'Google Drive ตอบช้าเกินไป กรุณาลองใหม่' : 'ตัวกลาง Google Drive ตอบกลับผิดรูปแบบ (ตรวจสอบการ Deploy ของ drive-bridge ว่าเลือก Who has access = Anyone)'); }
+    } finally { if (tm) clearTimeout(tm); }
     if (!j.ok) throw new Error(j.error || 'Google Drive ทำรายการไม่สำเร็จ');
     return j;
   }
@@ -445,35 +449,85 @@
     return u8;
   }
   function driveName(id) { return id + '.jpg'; }
-  // คำขออ่านที่เกิดพร้อมกันรวมเป็นคำขอเดียว ครั้งละไม่เกิน 8 รูป
-  let queue = [], timer = null;
+
+  // เก็บตัวรูปไว้ในเครื่อง (IndexedDB) — ส่งออกครั้งต่อไป/รูปที่อัปโหลดจากเครื่องนี้ ไม่ต้องโหลดจาก Drive ซ้ำ
+  let idbP = null;
+  function idb() {
+    if (!idbP) idbP = new Promise(function (resolve) {
+      try {
+        const rq = indexedDB.open('cn-monthly-photos', 1);
+        rq.onupgradeneeded = function () { rq.result.createObjectStore('b'); };
+        rq.onsuccess = function () { resolve(rq.result); };
+        rq.onerror = rq.onblocked = function () { resolve(null); };
+      } catch (e) { resolve(null); }
+    });
+    return idbP;
+  }
+  function idbDo(mode, fn) {
+    return idb().then(function (db) {
+      if (!db) return null;
+      return new Promise(function (resolve) {
+        try {
+          const tx = db.transaction('b', mode), rq = fn(tx.objectStore('b'));
+          tx.oncomplete = function () { resolve(rq && rq.result); };
+          tx.onerror = tx.onabort = function () { resolve(null); };
+        } catch (e) { resolve(null); }
+      });
+    });
+  }
+  function idbGet(id) { return idbDo('readonly', function (s) { return s.get(id); }).then(function (v) { return v instanceof Uint8Array ? v : v ? new Uint8Array(v) : null; }); }
+  function idbPut(id, u8) { return idbDo('readwrite', function (s) { s.put(u8, id); }); }
+  function idbDel(ids) { return idbDo('readwrite', function (s) { ids.forEach(function (id) { s.delete(id); }); }); }
+
+  // รหัสไฟล์ใน Drive (บันทึกไว้ตอนอัปโหลด) — ให้ตัวกลางเปิดไฟล์ได้ทันทีโดยไม่ต้องค้นหาตามชื่อ
+  function driveIdOf(id) {
+    const p = FBL.docs('photos').find(function (d) { return d.__id === id; });
+    return (p && p.driveId) || '';
+  }
+  // คำขออ่านรวมครั้งละ 3 รูป ส่งพร้อมกันได้ 6 คำขอ · ตอบช้าเกิน 90 วินาทีลองใหม่ 1 ครั้ง
+  const GET_BATCH = 3, GET_PARALLEL = 6, GET_TIMEOUT = 90000;
+  let queue = [], timer = null, running = 0;
   function driveGet(id) {
     return new Promise(function (resolve, reject) {
       queue.push({ id: id, resolve: resolve, reject: reject });
-      if (!timer) timer = setTimeout(flushQueue, 40);
+      if (!timer) timer = setTimeout(pump, 40);
     });
   }
-  function flushQueue() {
+  function pump() {
     timer = null;
-    const all = queue.splice(0, queue.length);
-    for (let i = 0; i < all.length; i += 8) {
-      const part = all.slice(i, i + 8);
-      bridge({ action: 'get', names: part.map(function (x) { return driveName(x.id); }) }).then(function (j) {
-        const by = {};
-        (j.files || []).forEach(function (f) { by[f.name] = f; });
-        part.forEach(function (x) {
-          const f = by[driveName(x.id)];
-          x.resolve(f && !f.missing ? fromB64(f.data) : null);
-        });
-      }, function (e) { part.forEach(function (x) { x.reject(e); }); });
+    while (running < GET_PARALLEL && queue.length) {
+      const part = queue.splice(0, GET_BATCH);
+      running++;
+      const done = function () { running--; pump(); };
+      fetchPart(part, 1).then(done, done);
     }
+  }
+  function fetchPart(part, retries) {
+    return bridge({
+      action: 'get',
+      names: part.map(function (x) { return driveName(x.id); }),
+      ids: part.map(function (x) { return driveIdOf(x.id); })
+    }, GET_TIMEOUT).then(function (j) {
+      const by = {};
+      (j.files || []).forEach(function (f) { by[f.name] = f; });
+      part.forEach(function (x) {
+        const f = by[driveName(x.id)];
+        // รูปเก่าที่ยังไม่มีรหัสไฟล์ Drive — จดไว้ให้ครั้งหน้าเร็วขึ้น
+        if (f && f.id && !driveIdOf(x.id)) FBL.commit([{ op: 'update', col: 'photos', id: x.id, data: { driveId: f.id } }]).catch(function () {});
+        x.resolve(f && !f.missing ? fromB64(f.data) : null);
+      });
+    }, function (e) {
+      if (retries > 0) return fetchPart(part, retries - 1);
+      part.forEach(function (x) { x.reject(e); });
+    });
   }
 
   FBL.savePhoto = async function (id, meta, bytes) {
     if (DRIVE) {
       const j = await bridge({ action: 'put', name: driveName(id), month: meta.mk, slot: meta.slot, orig: meta.name, data: toB64(bytes) });
       if (j.size !== bytes.length) throw new Error('อัปโหลดรูปไม่ครบ กรุณาลองใหม่');
-      await FBL.set('photos', id, Object.assign({}, meta, { store: 'drive' }));
+      await FBL.set('photos', id, Object.assign({}, meta, { store: 'drive', driveId: j.id || '' }));
+      idbPut(id, bytes);
       return;
     }
     await FBL.commit([
@@ -484,18 +538,28 @@
   const photoCache = new Map();
   FBL.photoBytes = async function (id) {
     if (photoCache.has(id)) return photoCache.get(id);
-    let u8 = DRIVE ? await driveGet(id) : null;
+    let u8 = DRIVE ? await idbGet(id) : null;
+    const local = !!u8;
+    if (!u8 && DRIVE) u8 = await driveGet(id);
     if (!u8) {   // รูปที่อัปโหลดก่อนเปลี่ยนมาใช้ Drive ยังอยู่ใน photoData
       const d = await FBL.get('photoData', id);
       if (!d || !d.data) throw new Error('ไม่พบข้อมูลรูป (อาจถูกลบไปแล้ว)');
       u8 = store.fromBytes(d.data);
     }
+    if (DRIVE && !local) idbPut(id, u8);
     photoCache.set(id, u8);
     return u8;
   };
   // โหลดรูปล่วงหน้าพร้อมกันหลายรูป (ก่อนส่งออก) — รูปที่โหลดไม่ได้ข้ามไป ให้ photoBytes แจ้งตอนใช้จริง
-  FBL.prefetchPhotos = function (ids) {
-    return Promise.all(ids.map(function (id) { return FBL.photoBytes(id).catch(function () { return null; }); }));
+  // onProgress(โหลดเสร็จแล้ว, ทั้งหมด)
+  FBL.prefetchPhotos = function (ids, onProgress) {
+    let n = 0;
+    return Promise.all(ids.map(function (id) {
+      return FBL.photoBytes(id).catch(function () { return null; }).then(function (v) {
+        n++; if (onProgress) onProgress(n, ids.length);
+        return v;
+      });
+    }));
   };
   FBL.deletePhotos = async function (ids) {
     if (DRIVE) {
@@ -508,6 +572,7 @@
       ops.push({ op: 'delete', col: 'photoData', id: id });
       photoCache.delete(id);
     });
+    idbDel(ids);
     await FBL.commit(ops);
   };
 })();
