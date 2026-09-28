@@ -381,6 +381,11 @@
   /* ======================================================================
      อ่าน / เขียนข้อมูล
      ====================================================================== */
+  // บอกว่าไม่มีสิทธิ์ที่คอลเลกชันไหน — ใช้เทียบกับกฎใน Firebase Console
+  function where(e, act, cols) {
+    if (!e || e.code !== 'permission-denied') return '';
+    return ' [' + act + ': ' + Array.from(new Set(cols)).join(', ') + ']';
+  }
   const subs = {};
   FBL.watch = function (col, onChange) {
     if (subs[col]) { subs[col].onChange = onChange || subs[col].onChange; return subs[col].first; }
@@ -392,7 +397,7 @@
         else if (s.onChange) { try { s.onChange(col, docs); } catch (e) { console.error(e); } }
       }, function (err) {
         console.error('watch ' + col + ' failed', err);
-        if (FBL.onError) FBL.onError(thErr(err));
+        if (FBL.onError) FBL.onError(thErr(err) + where(err, 'อ่าน', [col]));
         if (!s.firstDone) { s.firstDone = true; resolve([]); }
       });
     });
@@ -404,12 +409,12 @@
   };
 
   FBL.get = async function (col, id) {
-    try { return await store.get(col, String(id)); } catch (e) { throw new Error(thErr(e)); }
+    try { return await store.get(col, String(id)); } catch (e) { throw new Error(thErr(e) + where(e, 'อ่าน', [col])); }
   };
   // ops: [{ op: 'set'|'update'|'delete', col, id, data, merge }]
   FBL.commit = async function (ops) {
     const list = ops.map(function (o) { return Object.assign({}, o, { id: String(o.id), data: o.data ? clean(o.data) : o.data }); });
-    try { await store.commit(list); } catch (e) { throw new Error(thErr(e)); }
+    try { await store.commit(list); } catch (e) { throw new Error(thErr(e) + where(e, 'บันทึก', list.map(function (o) { return o.col; }))); }
   };
   FBL.set = function (col, id, data, merge) { return FBL.commit([{ op: 'set', col: col, id: id, data: data, merge: !!merge }]); };
   FBL.del = function (col, id) { return FBL.commit([{ op: 'delete', col: col, id: id }]); };
