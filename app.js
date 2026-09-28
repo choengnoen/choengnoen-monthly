@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const S = { reports: [], records: [], photos: [], plans: [], mk: '', tab: 'import', pending: null, probDraft: null, exporting: false };
+  const S = { reports: [], records: [], photos: [], plans: [], config: [], mk:'', tab: 'import', pending: null, probDraft: null, exporting: false };
   const $ = function (sel, root) { return (root || document).querySelector(sel); };
   const $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -63,6 +63,8 @@
     if (picked && (!ch.length || ch.indexOf(picked) >= 0)) return picked;
     return ch[0] || RE.DEFAULT_UNITS[code] || 'หน่วย';
   }
+  // การตั้งค่าที่ใช้ทุกเดือน (config/settings) เช่น ตรากรมทางหลวงบนหน้าปก
+  function settings() { return S.config.find(function (c) { return c.__id === 'settings'; }) || {}; }
   function planOf(fy) { return S.plans.find(function (p) { return p.__id === String(fy); }) || null; }
   function validChoice(c, n) { return n > 0 && c != null && c !== '' && Number(c) < RE.templates(n).length ? Number(c) : null; }
   function photoSpec(p) { return { id: p.id || p.__id, w: p.w, h: p.h, fx: p.fx, fy: p.fy }; }
@@ -258,9 +260,9 @@
     // โหลดข้อมูลให้เสร็จก่อนค่อยสลับหน้า — ไม่ให้เห็นหน้าระบบว่าง ๆ แล้วค่อยกระโดดเป็นข้อมูล
     loginWait('กำลังโหลดข้อมูล…');
     const onChange = function (col, docs) { S[col] = docs; if (col === 'photos') S.photos.forEach(function (p) { p.id = p.__id; }); scheduleRender(col); };
-    const got = await Promise.all(['reports', 'records', 'photos', 'plans'].map(function (c) { return FBL.watch(c, onChange); }));
+    const got = await Promise.all(['reports', 'records', 'photos', 'plans', 'config'].map(function (c) { return FBL.watch(c, onChange); }));
     if (my !== session || !FBL.user) return;   // ออกจากระบบไประหว่างโหลด
-    S.reports = got[0]; S.records = got[1]; S.photos = got[2]; S.plans = got[3];
+    S.reports = got[0]; S.records = got[1]; S.photos = got[2]; S.plans = got[3]; S.config = got[4];
     S.photos.forEach(function (p) { p.id = p.__id; });
     const last = lsGet('cn-monthly-mk');
     const ids = S.reports.map(function (r) { return r.__id; }).sort();
@@ -742,7 +744,54 @@
      ====================================================================== */
   function coverSpec() {
     const c = photosOf('cover')[0];
-    return RE.slideCover({ mk: S.mk, meetingText: rep().meetingText, orgText: rep().orgText, cover: c ? photoSpec(c) : null });
+    return RE.slideCover({ mk: S.mk, meetingText: rep().meetingText, orgText: rep().orgText, cover: c ? photoSpec(c) : null, logo: settings().logo });
+  }
+  // ตรากรมทางหลวง: ย่อให้ไม่เกิน 600 px วางกลางผืนสี่เหลี่ยมจัตุรัสพื้นโปร่งใส (กรอบบนปกเป็นจัตุรัส รูปไม่ถูกยืด)
+  // เก็บเป็น PNG (คงพื้นโปร่งใส) — ถ้าใหญ่เกินที่เอกสาร Firestore รับได้ (~1 MB) ย่อลงอีก
+  function logoDataUrl(file) {
+    return new Promise(function (res, rej) {
+      const url = URL.createObjectURL(file);
+      const im = new Image();
+      im.onload = function () {
+        URL.revokeObjectURL(url);
+        let side = Math.min(600, Math.max(im.naturalWidth, im.naturalHeight));
+        for (let i = 0; i < 5; i++) {
+          const c = document.createElement('canvas');
+          c.width = c.height = side;
+          const k = side / Math.max(im.naturalWidth, im.naturalHeight);
+          const w = im.naturalWidth * k, h = im.naturalHeight * k;
+          c.getContext('2d').drawImage(im, (side - w) / 2, (side - h) / 2, w, h);
+          const d = c.toDataURL('image/png');
+          if (d.length < 700000) { res(d); return; }
+          side = Math.round(side * 0.75);
+        }
+        rej(new Error('ไฟล์ตรามีรายละเอียดมากเกินไป — ลองใช้ไฟล์ PNG/JPG ที่เล็กลง'));
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); rej(new Error('เปิดไฟล์รูปนี้ไม่ได้ — ใช้ไฟล์ PNG หรือ JPG')); };
+      im.src = url;
+    });
+  }
+  // ช่องตรากรมทางหลวง (หน้า ③) — เปลี่ยนได้เฉพาะเจ้าของระบบ/ผู้ดูแลระบบ (กฎ config/settings)
+  function logoHtml() {
+    const st = settings();
+    const img = '<img src="' + esc(st.logo || 'assets/cover-logo.png') + '" alt="ตรากรมทางหลวง" style="width:64px;height:64px;object-fit:contain;flex:none">';
+    const info = st.logo
+      ? 'ใช้ตราที่อัปโหลด' + (st.logoName ? ' (' + esc(st.logoName) + ')' : '') + (st.logoBy ? '<br>โดย ' + esc(st.logoBy) : '')
+      : 'ใช้ตราเดิม (จากรายงานเดือน มิ.ย. 69)';
+    let h = '<label class="f" style="margin-top:14px">ตรากรมทางหลวง (ใช้กับหน้าปกทุกเดือน)</label>' +
+      '<div class="row" style="align-items:center;gap:10px;flex-wrap:nowrap">' + img + '<div class="small muted">' + info + '</div></div>';
+    if (!FBL.isPrivileged()) return h + '<p class="small muted">เปลี่ยนตราได้เฉพาะเจ้าของระบบหรือผู้ดูแลระบบ</p>';
+    h += '<div class="drop small" id="logoDrop" style="margin-top:8px"><b>อัปโหลดตรากรมทางหลวง</b> — ลากไฟล์มาวาง หรือคลิกเลือก (แนะนำ PNG พื้นโปร่งใส)</div>';
+    if (st.logo) h += '<button class="btn btn-sm" id="logoReset">ใช้ตราเดิม</button>';
+    return h;
+  }
+  function uploadLogo(files) {
+    const f = files.filter(function (x) { return /^image\//.test(x.type); })[0];
+    if (!f) { toast('เลือกไฟล์รูปภาพ (PNG หรือ JPG)', 'err'); return; }
+    run(async function () {
+      const d = await logoDataUrl(f);
+      await FBL.set('config', 'settings', { logo: d, logoName: f.name, logoAt: FBL.nowIso(), logoBy: FBL.user.name }, true);
+    }, 'บันทึกตรากรมทางหลวงแล้ว — ใช้กับหน้าปกทุกเดือน');
   }
   function problemSpecs(pr) {
     const pts = pr.points || [];
@@ -777,7 +826,7 @@
       '<label class="f" style="margin-top:10px">ข้อความบรรทัดบน</label><input type="text" id="orgText" placeholder="แขวงทางหลวงระยอง" value="' + esc(r.orgText || '') + '">' +
       '<label class="f" style="margin-top:14px">รูปหน้าปก</label><div class="drop small" data-pdrop-cover="1"><b>เปลี่ยนรูปปก</b> — ลากรูปมาวาง หรือคลิกเลือก (ใช้รูปแนวนอน)</div>' +
       (photosOf('cover').length ? thumbsHtml('cover') + '<button class="btn btn-sm" id="coverReset">ใช้รูปปกเริ่มต้น</button>' : '<p class="small muted">ตอนนี้ใช้รูปปกเริ่มต้น (ภาพถนนจากรายงานเดิม)</p>') +
-      '</div></div></div>';
+      logoHtml() + '</div></div></div>';
 
     h += '<div class="card"><div class="card-head"><h2>ปัญหา อุปสรรค</h2><div class="sp"></div><button class="btn btn-primary" id="addProb">+ เพิ่มเรื่องปัญหา/ความเสียหาย</button></div>' +
       '<p class="small muted" style="margin-top:0">กรอกเป็นช่อง ระบบเรียงข้อความบนสไลด์ให้ เช่น "กม.14+100 ด้านขวาทาง / ไหล่ทาง ถูกน้ำกัดเซาะ / ความยาว 12.00 ม. / ลึก 3.00 ม." — สไลด์ละ 3 จุด เกินกว่านั้นแยกสไลด์ให้อัตโนมัติ</p>';
@@ -820,6 +869,11 @@
     $('#orgText').oninput = function () { liveCover(); saveCoverText(); };
     bindDrop($('[data-pdrop-cover]', p), 'image/*', false, function (files) { addPhotos(files, 'cover', { single: true }); });
     if ($('#coverReset')) $('#coverReset').onclick = function () { run(function () { return FBL.deletePhotos(photosOf('cover').map(function (x) { return x.__id; })); }); };
+    if ($('#logoDrop')) bindDrop($('#logoDrop'), 'image/*', false, uploadLogo);
+    if ($('#logoReset')) $('#logoReset').onclick = async function () {
+      if (await confirmBox('กลับไปใช้ตรากรมทางหลวงเดิม?', '<p>ตราที่อัปโหลดไว้จะถูกลบ มีผลกับหน้าปกทุกเดือน</p>', 'ใช้ตราเดิม'))
+        run(function () { return FBL.set('config', 'settings', { logo: '', logoName: '', logoAt: FBL.nowIso(), logoBy: FBL.user.name }, true); }, 'กลับไปใช้ตราเดิมแล้ว');
+    };
     $$('[data-pdrop]', p).forEach(function (d) { bindDrop(d, 'image/*', true, function (files) { addPhotos(files, d.getAttribute('data-pdrop')); }); });
     bindThumbs(p);
     bindLayoutSelects(p);
@@ -902,7 +956,7 @@
     });
   }
   function liveCover() {
-    const spec = RE.slideCover({ mk: S.mk, meetingText: $('#meetingText').value.trim(), orgText: $('#orgText').value.trim(), cover: photosOf('cover')[0] ? photoSpec(photosOf('cover')[0]) : null });
+    const spec = RE.slideCover({ mk: S.mk, meetingText: $('#meetingText').value.trim(), orgText: $('#orgText').value.trim(), cover: photosOf('cover')[0] ? photoSpec(photosOf('cover')[0]) : null, logo: settings().logo });
     $('#coverPrev').innerHTML = slideHtml(spec);
   }
   function renderCoverPreview() { const el = $('#coverPrev'); if (el) { el.innerHTML = slideHtml(coverSpec()); bindSlideClicks(el); } }

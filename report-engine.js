@@ -637,13 +637,13 @@
     return { type: 'text', x: 2.4, y: y || 0.62, w: 17.3, h: 1.3, text: text, size: size || 26, bold: true, color: NAVY, align: 'center', valign: 'middle' };
   }
 
-  // หน้าปก — ctx: { mk, meetingText, cover: {id, w, h, fx, fy} | null }
+  // หน้าปก — ctx: { mk, meetingText, cover: {id, w, h, fx, fy} | null, logo: data URL ตรากรมที่อัปโหลด (ไม่มี = ใช้ตราเดิม) }
   RE.slideCover = function (ctx) {
     const area = { x: 2.583, y: 0.375, w: 17.083, h: 10.514 };
     const els = [{ type: 'bg', src: A('frame-title.jpg') }];
     if (ctx.cover) els.push(Object.assign({ type: 'photo', id: ctx.cover.id, pw: ctx.cover.w, ph: ctx.cover.h, fx: ctx.cover.fx, fy: ctx.cover.fy }, area));
     else els.push(Object.assign({ type: 'image', src: A('cover-default.jpg'), pw: 2400, ph: 1599 }, area));
-    els.push({ type: 'image', src: A('cover-logo.png'), x: 9.833, y: 2.458, w: 2.167, h: 2.167 });
+    els.push({ type: 'image', src: ctx.logo || A('cover-logo.png'), x: 9.833, y: 2.458, w: 2.167, h: 2.167 });
     els.push({ type: 'image', src: A('cover-badge.png'), x: 8.375, y: 5.153, w: 5.5, h: 1.389 });
     els.push({ type: 'text', x: 7.6, y: 7.25, w: 6.9, h: 0.85, text: ctx.orgText || 'แขวงทางหลวงระยอง', size: 30, bold: true, color: NAVY, align: 'center', valign: 'middle', glow: true });
     els.push({ type: 'text', x: 5.6, y: 8.2, w: 10.9, h: 0.8, text: ctx.meetingText || ('การประชุมประจำเดือน ' + RE.mkLabel(ctx.mk)), size: 28, bold: true, color: NAVY, align: 'center', valign: 'middle', glow: true });
