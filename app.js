@@ -315,7 +315,7 @@
 
   function renderHeader() {
     const ids = S.reports.map(function (r) { return r.__id; }).sort().reverse();
-    $('#monthSel').innerHTML = ids.map(function (id) { return '<option value="' + id + '"' + (id === S.mk ? ' selected' : '') + '>รายงานเดือน ' + esc(RE.mkLabel(id)) + '</option>'; }).join('');
+    $('#monthSel').innerHTML = ids.map(function (id) { return '<option value="' + id + '"' + (id === S.mk ? ' selected' : '') + '>รายงานเดือน ' + esc(RE.mkLabel(id)) + ' · ประชุม ' + esc(RE.mkLabel(RE.nextMk(id))) + '</option>'; }).join('');
     $$('#tabs button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === S.tab); });
     const recs = monthRecords();
     $('#bImport').textContent = recs.length;
@@ -346,7 +346,8 @@
     else { m = now.getMonth(); y = now.getFullYear() + 543; if (m === 0) { m = 12; y--; } }
     const years = [];
     for (let yy = now.getFullYear() + 544; yy >= now.getFullYear() + 541; yy--) years.push(yy);
-    const html = '<div class="grid2"><div><label class="f">เดือน</label><select id="nmM">' +
+    const html = '<p class="small muted" style="margin-top:0">เลือก <b>เดือนของข้อมูลผลงาน</b> — หน้าปกจะขึ้นเป็นการประชุมเดือนถัดไปให้เอง (เช่น ข้อมูล สิงหาคม → ประชุม กันยายน)</p>' +
+      '<div class="grid2"><div><label class="f">เดือนของข้อมูล</label><select id="nmM">' +
       RE.MONTHS.map(function (n, i) { return '<option value="' + (i + 1) + '"' + (i + 1 === m ? ' selected' : '') + '>' + n + '</option>'; }).join('') +
       '</select></div><div><label class="f">ปี (พ.ศ.)</label><select id="nmY">' + years.map(function (yy) { return '<option' + (yy === y ? ' selected' : '') + '>' + yy + '</option>'; }).join('') + '</select></div></div>' +
       '<p class="small muted">หน่วยนับของแต่ละรหัสงานอ้างอิงจากฐานข้อมูลกลาง (รหัสงาน) — รหัสงานที่มีหลายหน่วย เลือกหน่วยของเดือนนี้ได้ที่แท็บรายรหัสงาน</p>';
@@ -827,7 +828,7 @@
     const p = $('[data-panel="cover"]');
     const r = rep();
     let h = '<div class="card"><div class="card-head"><h2>หน้าปก</h2></div><div class="work"><div id="coverPrev"></div><div>' +
-      '<label class="f">ข้อความบรรทัดล่าง</label><input type="text" id="meetingText" placeholder="การประชุมประจำเดือน ' + esc(RE.mkLabel(S.mk)) + '" value="' + esc(r.meetingText || '') + '">' +
+      '<label class="f">ข้อความบรรทัดล่าง</label><input type="text" id="meetingText" placeholder="การประชุมประจำเดือน ' + esc(RE.mkLabel(RE.nextMk(S.mk))) + '" value="' + esc(r.meetingText || '') + '">' +
       '<label class="f" style="margin-top:10px">ข้อความบรรทัดบน</label><input type="text" id="orgText" placeholder="แขวงทางหลวงระยอง" value="' + esc(r.orgText || '') + '">' +
       '<label class="f" style="margin-top:14px">รูปหน้าปก</label><div class="drop small" data-pdrop-cover="1"><b>เปลี่ยนรูปปก</b> — ลากรูปมาวาง หรือคลิกเลือก (ใช้รูปแนวนอน)</div>' +
       (photosOf('cover').length ? thumbsHtml('cover') + '<button class="btn btn-sm" id="coverReset">ใช้รูปปกเริ่มต้น</button>' : '<p class="small muted">ตอนนี้ใช้รูปปกเริ่มต้น (ภาพถนนจากรายงานเดิม)</p>') +

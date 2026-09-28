@@ -58,6 +58,12 @@
     const p = String(mk || '').split('-');
     return p.length === 2 ? RE.MONTHS[Number(p[1]) - 1] + ' ' + p[0] : String(mk || '');
   };
+  // เดือนถัดไป (ธ.ค. 2569 → ม.ค. 2570) — ใช้กับหน้าปก: รายงานเดือน ส.ค. นำเข้าประชุมเดือน ก.ย.
+  RE.nextMk = function (mk) {
+    const p = String(mk || '').split('-').map(Number);
+    if (p.length !== 2 || !p[0] || !p[1]) return String(mk || '');
+    return p[1] === 12 ? (p[0] + 1) + '-01' : p[0] + '-' + String(p[1] + 1).padStart(2, '0');
+  };
   RE.mkShort = function (mk) {
     const p = String(mk || '').split('-');
     return p.length === 2 ? RE.MONTHS_SHORT[Number(p[1]) - 1] + ' ' + p[0].slice(2) : String(mk || '');
@@ -677,7 +683,7 @@
     els.push({ type: 'image', src: ctx.logo || A('cover-logo.png'), x: 9.833, y: 2.458, w: 2.167, h: 2.167 });
     els.push({ type: 'image', src: A('cover-badge.png'), x: 8.375, y: 5.153, w: 5.5, h: 1.389 });
     els.push({ type: 'text', x: 7.6, y: 7.25, w: 6.9, h: 0.85, text: ctx.orgText || 'แขวงทางหลวงระยอง', size: 30, bold: true, color: NAVY, align: 'center', valign: 'middle', glow: true });
-    els.push({ type: 'text', x: 5.6, y: 8.2, w: 10.9, h: 0.8, text: ctx.meetingText || ('การประชุมประจำเดือน ' + RE.mkLabel(ctx.mk)), size: 28, bold: true, color: NAVY, align: 'center', valign: 'middle', glow: true });
+    els.push({ type: 'text', x: 5.6, y: 8.2, w: 10.9, h: 0.8, text: ctx.meetingText || ('การประชุมประจำเดือน ' + RE.mkLabel(RE.nextMk(ctx.mk))), size: 28, bold: true, color: NAVY, align: 'center', valign: 'middle', glow: true });
     return { kind: 'cover', title: 'หน้าปก', els: els };
   };
 
