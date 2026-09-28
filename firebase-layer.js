@@ -484,8 +484,9 @@
     const p = FBL.docs('photos').find(function (d) { return d.__id === id; });
     return (p && p.driveId) || '';
   }
-  // คำขออ่านรวมครั้งละ 3 รูป ส่งพร้อมกันได้ 6 คำขอ · ตอบช้าเกิน 90 วินาทีลองใหม่ 1 ครั้ง
-  const GET_BATCH = 3, GET_PARALLEL = 6, GET_TIMEOUT = 90000;
+  // คำขอละ 1 รูป ส่งพร้อมกันได้ 10 คำขอ (Apps Script อ่านรูปในคำขอเดียวทีละรูป — แยกคำขอแล้วได้ทำงานขนานกันจริง)
+  // ตอบช้าเกิน 60 วินาทีลองใหม่ 1 ครั้ง
+  const GET_BATCH = 1, GET_PARALLEL = 10, GET_TIMEOUT = 60000;
   let queue = [], timer = null, running = 0;
   function driveGet(id) {
     return new Promise(function (resolve, reject) {
@@ -535,9 +536,14 @@
       { op: 'set', col: 'photos', id: id, data: meta }
     ]);
   };
-  const photoCache = new Map();
-  FBL.photoBytes = async function (id) {
-    if (photoCache.has(id)) return photoCache.get(id);
+  const photoCache = new Map(), photoLoading = new Map();
+  // รูปเดียวกันที่ถูกขอซ้ำระหว่างกำลังโหลด (เช่น โหลดล่วงหน้าอยู่แล้วกดส่งออก) ใช้คำขอเดิม ไม่โหลดซ้ำ
+  FBL.photoBytes = function (id) {
+    if (photoCache.has(id)) return Promise.resolve(photoCache.get(id));
+    if (!photoLoading.has(id)) photoLoading.set(id, loadPhoto(id).finally(function () { photoLoading.delete(id); }));
+    return photoLoading.get(id);
+  };
+  async function loadPhoto(id) {
     let u8 = DRIVE ? await idbGet(id) : null;
     const local = !!u8;
     if (!u8 && DRIVE) u8 = await driveGet(id);
@@ -549,7 +555,7 @@
     if (DRIVE && !local) idbPut(id, u8);
     photoCache.set(id, u8);
     return u8;
-  };
+  }
   // โหลดรูปล่วงหน้าพร้อมกันหลายรูป (ก่อนส่งออก) — รูปที่โหลดไม่ได้ข้ามไป ให้ photoBytes แจ้งตอนใช้จริง
   // onProgress(โหลดเสร็จแล้ว, ทั้งหมด)
   FBL.prefetchPhotos = function (ids, onProgress) {

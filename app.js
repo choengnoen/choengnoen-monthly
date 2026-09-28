@@ -1176,11 +1176,18 @@
       '(ประมาณ ' + RE.fmt(monthPhotos.reduce(function (s, x) { return s + (x.size || 0); }, 0) / 1048576, 1) + ' MB) — เมื่อส่งออกและนำเสนอเรียบร้อยแล้วลบได้ หรือระบบจะถามให้ลบตอนเริ่มเดือนใหม่</p>' +
       '<button class="btn btn-danger" id="clearPhotos"' + (monthPhotos.length ? '' : ' disabled') + '>ลบรูปทั้งหมดของเดือนนี้</button></div>';
     p.innerHTML = h;
+    // เริ่มโหลดรูปจาก Drive เงียบ ๆ ตั้งแต่เปิดแท็บนี้ — พอกดส่งออกรูปส่วนใหญ่จะพร้อมแล้ว
+    if (FBL.photoStore === 'drive' && !S.exporting) FBL.prefetchPhotos(photoIdsOf(specs));
     $('#doExport').onclick = doExport;
     $('#clearPhotos').onclick = async function () {
       if (await confirmBox('ลบรูปทั้งหมดของเดือนนี้?', '<p>' + monthPhotos.length + ' รูปจะถูกลบจากระบบ — ส่งออกไฟล์ PowerPoint เก็บไว้แล้วใช่ไหม?</p><p class="small muted">ตัวเลขผลงานไม่ถูกลบ</p>', 'ลบรูป', true))
         run(function () { return FBL.deletePhotos(monthPhotos.map(function (x) { return x.__id; })); }, 'ลบรูปแล้ว');
     };
+  }
+  function photoIdsOf(specs) {
+    const ids = [];
+    specs.forEach(function (s) { (s.els || []).forEach(function (e) { if (e.type === 'photo' && ids.indexOf(e.id) < 0) ids.push(e.id); }); });
+    return ids;
   }
   async function doExport() {
     if (S.exporting) return;
@@ -1192,8 +1199,7 @@
     const bar = $('#expProg .progress>div');
     let step = 0;
     try {
-      const ids = [];
-      specs.forEach(function (s) { (s.els || []).forEach(function (e) { if (e.type === 'photo' && ids.indexOf(e.id) < 0) ids.push(e.id); }); });
+      const ids = photoIdsOf(specs);
       if (ids.length && FBL.photoStore === 'drive') {
         $('#expTxt').textContent = 'กำลังโหลดรูป ' + ids.length + ' รูปจาก Google Drive…';
         await FBL.prefetchPhotos(ids, function (n, total) {
