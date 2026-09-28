@@ -1143,8 +1143,8 @@
     return specs;
   }
   function defaultFileName() {
-    const p = S.mk.split('-');
-    return 'ม.เชิงเนิน รายงานเดือน ' + RE.MONTHS_SHORT[Number(p[1]) - 1] + ' ' + p[0].slice(2) + '.pptx';
+    // ใช้เดือนประชุม (เดือนถัดไป) — รายงานเดือน ส.ค. 69 → ชื่อไฟล์ ก.ย. 69, ธ.ค. 69 → ม.ค. 70
+    return 'ม.เชิงเนิน รายงานเดือน ' + RE.mkShort(RE.nextMk(S.mk)) + '.pptx';
   }
   function renderExport() {
     const p = $('[data-panel="export"]');
