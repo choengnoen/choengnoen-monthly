@@ -113,21 +113,25 @@
   }
   function chartSvg(e) {
     if (e.kind === 'pie') {
+      // หน่วยใน SVG = pt (1/72 นิ้ว) ของกรอบกราฟ — วงกลมอยู่ในพื้นที่ e.plot แบบเดียวกับใน PowerPoint
+      const VW = e.w * 72, VH = e.h * 72, fsz = e.labelSize || 16;
       const tot = e.values.reduce(function (s, v) { return s + v; }, 0);
-      if (!tot) return '<svg viewBox="0 0 100 88"><text x="50" y="45" text-anchor="middle" font-size="5" fill="#888">ไม่มีข้อมูล</text></svg>';
+      if (!tot) return '<svg viewBox="0 0 ' + VW + ' ' + VH + '"><text x="' + VW / 2 + '" y="' + VH / 2 + '" text-anchor="middle" font-size="' + fsz + '" fill="#888">ไม่มีข้อมูล</text></svg>';
+      const pl = e.plot || { x: 0.22, y: 0.2, w: 0.56, h: 0.6 };
+      const cx = (pl.x + pl.w / 2) * VW, cy = (pl.y + pl.h / 2) * VH, r = Math.min(pl.w * VW, pl.h * VH) / 2;
       let a = -Math.PI / 2, out = '';
       e.values.forEach(function (v, i) {
         const ang = v / tot * Math.PI * 2, a2 = a + ang, mid = a + ang / 2;
-        const r = 26, cx = 50, cy = 46;
         const x1 = cx + r * Math.cos(a), y1 = cy + r * Math.sin(a), x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
-        out += e.values.length === 1 ? '<circle cx="50" cy="46" r="26" fill="#' + e.colors[i] + '"/>' :
-          '<path d="M' + cx + ' ' + cy + ' L' + x1 + ' ' + y1 + ' A' + r + ' ' + r + ' 0 ' + (ang > Math.PI ? 1 : 0) + ' 1 ' + x2 + ' ' + y2 + ' Z" fill="#' + e.colors[i] + '" stroke="#fff" stroke-width=".6"/>';
-        const lx = cx + 38 * Math.cos(mid), ly = cy + 36 * Math.sin(mid);
-        out += '<text x="' + lx + '" y="' + ly + '" text-anchor="middle" font-size="3.2" fill="#404040">' + esc(e.labels[i]) +
-          '<tspan x="' + lx + '" dy="4">' + RE.fmt(v, 0) + ' บาท</tspan><tspan x="' + lx + '" dy="4">(' + RE.fmt(v / tot * 100) + '%)</tspan></text>';
+        out += e.values.length === 1 ? '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#' + e.colors[i] + '"/>' :
+          '<path d="M' + cx + ' ' + cy + ' L' + x1 + ' ' + y1 + ' A' + r + ' ' + r + ' 0 ' + (ang > Math.PI ? 1 : 0) + ' 1 ' + x2 + ' ' + y2 + ' Z" fill="#' + e.colors[i] + '" stroke="#fff" stroke-width="1.5"/>';
+        const lr = r + fsz * 1.6, lx = cx + lr * Math.cos(mid), ly = cy + lr * Math.sin(mid) - fsz * 0.6;
+        const anc = Math.cos(mid) > 0.3 ? 'start' : (Math.cos(mid) < -0.3 ? 'end' : 'middle');
+        out += '<text x="' + lx + '" y="' + ly + '" text-anchor="' + anc + '" font-size="' + fsz + '" fill="#404040">' + esc(e.labels[i]) + ' (' + RE.fmt(v / tot * 100) + '%)' +
+          '<tspan x="' + lx + '" dy="' + (fsz * 1.2) + '">' + RE.fmt(v, 0) + ' บาท</tspan></text>';
         a = a2;
       });
-      return '<svg viewBox="0 0 100 88" width="100%" height="100%">' + out + '</svg>';
+      return '<svg viewBox="0 0 ' + VW + ' ' + VH + '" width="100%" height="100%" overflow="visible">' + out + '</svg>';
     }
     const n = e.labels.length, X0 = 10, X1 = 96, Y0 = 6, Y1 = 50;
     const px = function (i) { return X0 + (X1 - X0) * i / (n - 1); }, py = function (v) { return Y1 - (Y1 - Y0) * v / 120; };

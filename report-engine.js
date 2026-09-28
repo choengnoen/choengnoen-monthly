@@ -662,8 +662,10 @@
      ====================================================================== */
   const A = function (name) { return 'assets/' + name; };
 
+  // หัวเรื่องทุกหน้า: ชิดขอบบนพื้นที่สีขาวของกรอบ (ขอบขาวเริ่มที่ ~0.21 นิ้ว)
+  const TITLE_Y = 0.3;
   function title(text, y, size) {
-    return { type: 'text', x: 2.4, y: y || 0.62, w: 17.3, h: 1.3, text: text, size: size || 26, bold: true, color: NAVY, align: 'center', valign: 'middle' };
+    return { type: 'text', x: 2.4, y: y || TITLE_Y, w: 17.3, h: 0.8, text: text, size: size || 26, bold: true, color: NAVY, align: 'center', valign: 'middle' };
   }
 
   // หน้าปก — ctx: { mk, meetingText, cover: {id, w, h, fx, fy} | null, logo: data URL ตรากรมที่อัปโหลด (ไม่มี = ใช้ตราเดิม) }
@@ -695,7 +697,7 @@
   RE.PHOTO_AREA = { x: 2.75, y: 3.85, w: 10.5, h: 6.42 };
   RE.slideWork = function (a, unit, photos, choice) {
     const els = [{ type: 'bg', src: A('frame-work.jpg') }];
-    els.push(title('รหัส ' + a.code + ' ' + a.name, 0.62, a.name.length > 45 ? 20 : 26));
+    els.push(title('รหัส ' + a.code + ' ' + a.name, TITLE_Y, a.name.length > 45 ? 20 : 26));
 
     // รายการสายทาง — แบบต้นฉบับ: สายละ 1 บรรทัด จัดกลาง
     //   "ทล.3139   ตอน บ้านแลง – หาดใหญ่   กม. 12+000 - กม. 13+000   ( 400 ตร.ม. )"
@@ -709,18 +711,19 @@
         '( ' + RE.fmtQty(L.qty) + ' ' + (L.unit || unit) + ' )';
     });
     const n = rowsL.length;
-    const top = 1.6, avail = 1.36;
+    // พื้นที่ระหว่างหัวเรื่อง (ยกขึ้นบนแล้ว) กับเส้นคั่นยอดรวม — ตัวอักษรใหญ่พอให้อ่านจากท้ายห้องประชุมได้
+    const top = 1.15, avail = 1.82;
     const twoCol = n > 4;
     const per = twoCol ? Math.ceil(n / 2) : n;
-    const rowH = Math.min(0.42, avail / Math.max(per, 1));
+    const rowH = Math.min(0.5, avail / Math.max(per, 1));
     const colW = twoCol ? 8.5 : 17.3;
     // ขนาดตัวอักษร: ตามความสูงแถว แล้วลดลงถ้าบรรทัดยาวเกินกรอบ
-    let size = Math.min(twoCol ? 13 : 15, rowH * 72 * 0.6);
+    let size = Math.min(twoCol ? 16 : 20, rowH * 72 * 0.6);
     rowsL.forEach(function (t) {
       const fit = (colW - 0.3) / textWidthIn(t, 1);
       if (fit < size) size = fit;
     });
-    size = Math.max(9, Math.round(size * 2) / 2);
+    size = Math.max(10, Math.round(size * 2) / 2);
     const x0s = twoCol ? [2.4, 11.2] : [2.4];
     const bandY = top + (avail - per * rowH) / 2;
     // ทั้งกลุ่มอยู่กลางคอลัมน์ แต่ทุกบรรทัดเริ่มที่แนวเดียวกัน (ชิดซ้ายตามบรรทัดที่ยาวที่สุดของฝั่งนั้น)
@@ -738,9 +741,9 @@
     if (twoCol) els.push({ type: 'rect', x: 11.05, y: bandY, w: 0.02, h: per * rowH, fill: 'B8C4D6' });
     // เส้นคั่นก่อนยอดรวม
     els.push({ type: 'line', x: 6.4, y: 3.02, w: 9.3, color: 'B8C4D6', lineW: 0.75 });
-    els.push({ type: 'text', x: 2.4, y: 3.05, w: 17.3, h: 0.5, runs: [
-      { text: 'รวม   ', size: 16, bold: true, color: INK },
-      { text: a.qtyParts ? a.qtyParts.map(function (q) { return RE.fmtQty(q.qty) + ' ' + q.unit; }).join('  +  ') : RE.fmtQty(a.qty) + ' ' + unit, size: 16, bold: true, color: INK }], align: 'center', valign: 'middle' });
+    els.push({ type: 'text', x: 2.4, y: 3.04, w: 17.3, h: 0.6, runs: [
+      { text: 'รวม   ', size: 20, bold: true, color: INK },
+      { text: a.qtyParts ? a.qtyParts.map(function (q) { return RE.fmtQty(q.qty) + ' ' + q.unit; }).join('  +  ') : RE.fmtQty(a.qty) + ' ' + unit, size: 20, bold: true, color: INK }], align: 'center', valign: 'middle' });
 
     // รูป
     const lay = RE.layout(photos, RE.PHOTO_AREA, 0.1, choice);
@@ -790,7 +793,7 @@
   // สรุปผลงานประจำเดือน (กราฟวงกลม 2 รูป) — ใช้กรอบเมนู "รายงานผลการปฏิบัติงาน" ตามต้นฉบับ
   RE.slideMonthSummary = function (mk, aggs) {
     const els = [{ type: 'bg', src: A('frame-work.jpg') }];
-    els.push({ type: 'text', x: 2.4, y: 0.75, w: 17.3, h: 1.35, text: 'สรุปผลงานบำรุงปกติ\nประจำเดือน ' + RE.mkLabel(mk), size: 26, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.3 });
+    els.push({ type: 'text', x: 2.4, y: TITLE_Y, w: 17.3, h: 1.3, text: 'สรุปผลงานบำรุงปกติ\nประจำเดือน ' + RE.mkLabel(mk), size: 26, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.3 });
     const byGroup = {};
     aggs.forEach(function (a) { byGroup[a.group] = (byGroup[a.group] || 0) + a.total; });
     const gs = RE.GROUPS.filter(function (g) { return byGroup[g.code] > 0; });
@@ -802,11 +805,14 @@
         { text: 'กราฟแสดงสัดส่วนการใช้งบประมาณบำรุงปกติ\n', size: 16, bold: true, color: INK },
         { text: b[0], size: 16, color: '010A81' }], align: 'center', valign: 'middle' });
     });
-    els.push({ type: 'chart', kind: 'pie', x: 2.7, y: 3.75, w: 7.8, h: 6.9,
+    // ขนาด/ตำแหน่งกราฟวัดจากต้นฉบับ (รายงานเดือน มิ.ย. 69 สไลด์ 7): กรอบกราฟ + พื้นที่วงกลม (สัดส่วนในกรอบ) + ป้าย 24pt
+    // → วงกลมเส้นผ่านศูนย์กลาง 2.79 นิ้ว กึ่งกลางที่ (7.18, 7.50) และ (15.45, 7.38)
+    const PIE_PLOT = { x: 0.3557, y: 0.3099, w: 0.4632, h: 0.5294 };
+    els.push({ type: 'chart', kind: 'pie', x: 1.384, y: 4.474, w: 9.865, h: 5.271, plot: PIE_PLOT, labelSize: 24,
       labels: gs.map(function (g) { return g.code + ' งบประมาณ'; }), values: gs.map(function (g) { return Math.round(byGroup[g.code] * 100) / 100; }),
       colors: gs.map(function (g) { return g.color; }) });
     const nz = cats.map(function (c, i) { return i; }).filter(function (i) { return catVals[i] > 0; });
-    els.push({ type: 'chart', kind: 'pie', x: 10.9, y: 3.75, w: 7.8, h: 6.9,
+    els.push({ type: 'chart', kind: 'pie', x: 10.833, y: 4.354, w: 7.86, h: 5.271, plot: PIE_PLOT, labelSize: 24,
       labels: nz.map(function (i) { return cats[i][0]; }), values: nz.map(function (i) { return Math.round(catVals[i] * 100) / 100; }),
       colors: nz.map(function (i) { return cats[i][2]; }) });
     return { kind: 'summary', title: 'สรุปผลงานประจำเดือน', els: els };
@@ -815,7 +821,7 @@
   // สรุปแผนงาน - ผลงาน ตามรหัสงาน (6 กลุ่ม)
   RE.slidePlan = function (mk, plan, cum) {
     const els = [{ type: 'bg', src: A('frame-plan.jpg') }];
-    els.push({ type: 'text', x: 2.4, y: 0.7, w: 17.3, h: 1.25, text: 'สรุปแผนงาน - ผลงาน ตามรหัสงาน\nปีงบประมาณ ' + cum.fy, size: 26, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.3 });
+    els.push({ type: 'text', x: 2.4, y: TITLE_Y, w: 17.3, h: 1.3, text: 'สรุปแผนงาน - ผลงาน ตามรหัสงาน\nปีงบประมาณ ' + cum.fy, size: 26, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.3 });
     const planG = (plan && plan.groups) || {};
     const pTot = cum.planTotal || 0, rTot = cum.resultTotal || 0;
     RE.GROUPS.forEach(function (g, i) {
@@ -840,7 +846,7 @@
   // กราฟความก้าวหน้าการใช้งบประมาณ — ใช้รูปกราฟที่แคปจากระบบของกรม (img = photoSpec) วางเต็มกรอบโดยไม่ครอป
   RE.slideBudget = function (mk, plan, cum, img, lines) {
     const els = [{ type: 'bg', src: A('frame-budget.jpg') }];
-    els.push({ type: 'text', x: 2.4, y: 0.75, w: 17.3, h: 1.3, text: 'กราฟแสดงความก้าวหน้า\nการใช้งบประมาณบำรุงปกติ', size: 26, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.3 });
+    els.push({ type: 'text', x: 2.4, y: TITLE_Y, w: 17.3, h: 1.3, text: 'กราฟแสดงความก้าวหน้า\nการใช้งบประมาณบำรุงปกติ', size: 26, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.3 });
     const box = { x: 3.1, y: 2.25, w: 15.9, h: 6.55 };
     if (img && img.w && img.h) {
       const ar = img.w / img.h;
@@ -944,7 +950,7 @@
     const els = [{ type: 'bg', src: A('frame-problem.jpg') }];
     const tt = RE.problemTitles(pr);
     if (pageCount > 1) tt[0] += ' (' + pageNo + '/' + pageCount + ')';
-    els.push({ type: 'text', x: 2.4, y: 0.45, w: 17.3, h: 1.3, text: tt.filter(Boolean).join('\n'), size: 22, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.35 });
+    els.push({ type: 'text', x: 2.4, y: TITLE_Y - 0.05, w: 17.3, h: 1.3, text: tt.filter(Boolean).join('\n'), size: 22, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.35 });
     pts = (pts && pts.length ? pts : [{}]).slice(0, 3).map(function (p) { return { caption: RE.problemCaption(p) }; });
     const n = pts.length, X0 = 2.65, W = 16.8, gap = 0.35;
     const cw = (W - gap * (n - 1)) / n;
@@ -1074,9 +1080,9 @@
             s.addChart(pptx.ChartType.pie, [{ name: 'งบประมาณ', labels: labels, values: e.values }], {
               x: e.x, y: e.y, w: e.w, h: e.h, chartColors: e.colors, showLegend: false,
               showLabel: true, showValue: true, showPercent: false, dataLabelPosition: 'outEnd',
-              dataLabelFormatCode: '#,##0" บาท"', dataLabelColor: '404040', dataLabelFontSize: 16, dataLabelFontFace: FONT,
+              dataLabelFormatCode: '#,##0" บาท"', dataLabelColor: '404040', dataLabelFontSize: e.labelSize || 16, dataLabelFontFace: FONT,
               showLeaderLines: true, firstSliceAng: 0, dataBorder: { pt: 1.5, color: 'FFFFFF' },
-              layout: { x: 0.22, y: 0.2, w: 0.56, h: 0.6 }
+              layout: e.plot || { x: 0.22, y: 0.2, w: 0.56, h: 0.6 }
             });
           } else if (e.kind === 'line') {
             s.addChart(pptx.ChartType.line, e.series.map(function (sr) { return { name: sr.name, labels: e.labels, values: sr.values }; }), {
