@@ -182,10 +182,10 @@ table.pend tr.skip td:last-child{opacity:1}
 .slide .el-photo.sel{outline:3px solid var(--gold);z-index:3}
 
 /* งานรายรหัส */
-.work{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}
-.thumbs{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
-.thumb{width:132px;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff;font-size:12px}
-.thumb .im{height:90px;background-size:cover;background-position:center;position:relative;cursor:crosshair}
+.work{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:18px;align-items:start}
+.thumbs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}
+.thumb{min-width:0;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff;font-size:12px}
+.thumb .im{aspect-ratio:4/3;background-size:cover;background-position:center;position:relative;cursor:crosshair}
 .thumb .im .fp{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 2px var(--gold)}
 .thumb .no{position:absolute;left:4px;top:4px;background:rgba(10,37,64,.8);color:#fff;border-radius:6px;padding:0 6px;font-weight:700}
 .thumb .bar{display:flex;gap:2px;padding:4px;justify-content:space-between;align-items:center}
