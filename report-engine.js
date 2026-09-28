@@ -393,7 +393,7 @@
   RE.sumBy = function (records, key) { return round2(records.reduce(function (s, r) { return s + (Number(r[key]) || 0); }, 0)); };
 
   /* ---------------- แผน-ผลสะสม ---------------- */
-  // plan = { groups:{21100: บาท}, pct:[12 ค่า % แผนสะสม], carryMk, carryGroups:{}, carryCum:[12] }
+  // plan = { groups:{21100: บาท}, carryMk, carryGroups:{}, carryCum:[12] (ข้อมูลเก่า — ไม่มีก็ได้) }
   // คืนค่าผลสะสมตามกลุ่ม และผลสะสมรายเดือน ถึงเดือน mk
   RE.cumulative = function (plan, allRecords, mk) {
     plan = plan || {};
@@ -682,8 +682,8 @@
     else els.push(Object.assign({ type: 'image', src: A('cover-default.jpg'), pw: 2400, ph: 1599 }, area));
     els.push({ type: 'image', src: ctx.logo || A('cover-logo.png'), x: 9.833, y: 2.458, w: 2.167, h: 2.167 });
     els.push({ type: 'image', src: A('cover-badge.png'), x: 8.375, y: 5.153, w: 5.5, h: 1.389 });
-    els.push({ type: 'text', x: 7.6, y: 7.25, w: 6.9, h: 0.85, text: ctx.orgText || 'แขวงทางหลวงระยอง', size: 30, bold: true, color: NAVY, align: 'center', valign: 'middle', glow: true });
-    els.push({ type: 'text', x: 5.6, y: 8.2, w: 10.9, h: 0.8, text: ctx.meetingText || ('การประชุมประจำเดือน ' + RE.mkLabel(RE.nextMk(ctx.mk))), size: 28, bold: true, color: NAVY, align: 'center', valign: 'middle', glow: true });
+    els.push({ type: 'text', x: 5.55, y: 7.0, w: 11.0, h: 1.15, text: ctx.orgText || 'แขวงทางหลวงระยอง', size: 42, bold: true, color: NAVY, align: 'center', valign: 'middle', glow: true });
+    els.push({ type: 'text', x: 3.55, y: 8.25, w: 15.0, h: 1.1, text: ctx.meetingText || ('การประชุมประจำเดือน ' + RE.mkLabel(RE.nextMk(ctx.mk))), size: 38, bold: true, color: NAVY, align: 'center', valign: 'middle', glow: true });
     return { kind: 'cover', title: 'หน้าปก', els: els };
   };
 
@@ -811,16 +811,29 @@
         { text: 'กราฟแสดงสัดส่วนการใช้งบประมาณบำรุงปกติ\n', size: 16, bold: true, color: INK },
         { text: b[0], size: 16, color: '010A81' }], align: 'center', valign: 'middle' });
     });
-    // ขนาด/ตำแหน่งกราฟวัดจากต้นฉบับ (รายงานเดือน มิ.ย. 69 สไลด์ 7): กรอบกราฟ + พื้นที่วงกลม (สัดส่วนในกรอบ) + ป้าย 24pt
-    // → วงกลมเส้นผ่านศูนย์กลาง 2.79 นิ้ว กึ่งกลางที่ (7.18, 7.50) และ (15.45, 7.38)
-    const PIE_PLOT = { x: 0.3557, y: 0.3099, w: 0.4632, h: 0.5294 };
-    els.push({ type: 'chart', kind: 'pie', x: 1.384, y: 4.474, w: 9.865, h: 5.271, plot: PIE_PLOT, labelSize: 24,
-      labels: gs.map(function (g) { return g.code + ' งบประมาณ'; }), values: gs.map(function (g) { return Math.round(byGroup[g.code] * 100) / 100; }),
-      colors: gs.map(function (g) { return g.color; }) });
+    // วงกลมไม่มีป้ายรอบนอก (ชิ้นเล็กติดกันทำให้ป้ายทับกัน) — ใช้คำอธิบายสีด้านขวาของวงกลมแทน:
+    // ชื่อ (ตัวหนา) + ยอดเงินและร้อยละ บรรทัดละรายการ ปิดท้ายด้วยยอดรวม
+    const CY = 7.0, D = 3.2, ROW = 0.86;
+    function pieBlock(x0, rows) {
+      const tot = rows.reduce(function (s, r) { return s + r.v; }, 0);
+      els.push({ type: 'chart', kind: 'pie', noLabels: true, x: x0, y: CY - D / 2, w: D, h: D, plot: { x: 0.02, y: 0.02, w: 0.96, h: 0.96 },
+        labels: rows.map(function (r) { return r.name; }), values: rows.map(function (r) { return r.v; }), colors: rows.map(function (r) { return r.color; }) });
+      const lx = x0 + D + 0.25, lw = 4.1;
+      let y = CY - (rows.length * ROW + 0.55) / 2;
+      rows.forEach(function (r) {
+        els.push({ type: 'rect', x: lx, y: y + 0.1, w: 0.28, h: 0.28, fill: r.color, radius: 0.04 });
+        els.push({ type: 'text', x: lx + 0.4, y: y, w: lw - 0.4, h: 0.46, text: r.name, size: 16, bold: true, color: INK, valign: 'middle', inset: 0, wrap: false });
+        els.push({ type: 'text', x: lx + 0.4, y: y + 0.41, w: lw - 0.4, h: 0.4, runs: [
+          { text: RE.fmt(r.v) + ' บาท   ', color: INK },
+          { text: '(' + RE.fmt(tot ? r.v / tot * 100 : 0) + '%)', color: RED, bold: true }], size: 15, valign: 'middle', inset: 0, wrap: false });
+        y += ROW;
+      });
+      els.push({ type: 'line', x: lx, y: y + 0.02, w: lw, color: 'B8C4D6', lineW: 0.75 });
+      els.push({ type: 'text', x: lx + 0.4, y: y + 0.08, w: lw - 0.4, h: 0.48, text: 'รวม   ' + RE.fmt(tot) + ' บาท', size: 16, bold: true, color: NAVY, valign: 'middle', inset: 0, wrap: false });
+    }
+    pieBlock(3.0, gs.map(function (g) { return { name: g.code + ' ' + g.name, v: Math.round(byGroup[g.code] * 100) / 100, color: g.color }; }));
     const nz = cats.map(function (c, i) { return i; }).filter(function (i) { return catVals[i] > 0; });
-    els.push({ type: 'chart', kind: 'pie', x: 10.833, y: 4.354, w: 7.86, h: 5.271, plot: PIE_PLOT, labelSize: 24,
-      labels: nz.map(function (i) { return cats[i][0]; }), values: nz.map(function (i) { return Math.round(catVals[i] * 100) / 100; }),
-      colors: nz.map(function (i) { return cats[i][2]; }) });
+    pieBlock(11.2, nz.map(function (i) { return { name: cats[i][0], v: Math.round(catVals[i] * 100) / 100, color: cats[i][2] }; }));
     return { kind: 'summary', title: 'สรุปผลงานประจำเดือน', els: els };
   };
 
@@ -1085,7 +1098,7 @@
             const labels = e.labels.map(function (l, i) { return l + ' (' + RE.fmt(tot ? e.values[i] / tot * 100 : 0) + '%)'; });
             s.addChart(pptx.ChartType.pie, [{ name: 'งบประมาณ', labels: labels, values: e.values }], {
               x: e.x, y: e.y, w: e.w, h: e.h, chartColors: e.colors, showLegend: false,
-              showLabel: true, showValue: true, showPercent: false, dataLabelPosition: 'outEnd',
+              showLabel: !e.noLabels, showValue: !e.noLabels, showPercent: false, dataLabelPosition: 'outEnd',
               dataLabelFormatCode: '#,##0" บาท"', dataLabelColor: '404040', dataLabelFontSize: e.labelSize || 16, dataLabelFontFace: FONT,
               showLeaderLines: true, firstSliceAng: 0, dataBorder: { pt: 1.5, color: 'FFFFFF' },
               layout: e.plot || { x: 0.22, y: 0.2, w: 0.56, h: 0.6 }

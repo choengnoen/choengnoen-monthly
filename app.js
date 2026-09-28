@@ -125,11 +125,12 @@
         const x1 = cx + r * Math.cos(a), y1 = cy + r * Math.sin(a), x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
         out += e.values.length === 1 ? '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#' + e.colors[i] + '"/>' :
           '<path d="M' + cx + ' ' + cy + ' L' + x1 + ' ' + y1 + ' A' + r + ' ' + r + ' 0 ' + (ang > Math.PI ? 1 : 0) + ' 1 ' + x2 + ' ' + y2 + ' Z" fill="#' + e.colors[i] + '" stroke="#fff" stroke-width="1.5"/>';
+        a = a2;
+        if (e.noLabels) return;
         const lr = r + fsz * 1.6, lx = cx + lr * Math.cos(mid), ly = cy + lr * Math.sin(mid) - fsz * 0.6;
         const anc = Math.cos(mid) > 0.3 ? 'start' : (Math.cos(mid) < -0.3 ? 'end' : 'middle');
         out += '<text x="' + lx + '" y="' + ly + '" text-anchor="' + anc + '" font-size="' + fsz + '" fill="#404040">' + esc(e.labels[i]) + ' (' + RE.fmt(v / tot * 100) + '%)' +
           '<tspan x="' + lx + '" dy="' + (fsz * 1.2) + '">' + RE.fmt(v, 0) + ' บาท</tspan></text>';
-        a = a2;
       });
       return '<svg viewBox="0 0 ' + VW + ' ' + VH + '" width="100%" height="100%" overflow="visible">' + out + '</svg>';
     }
@@ -982,11 +983,9 @@
     const base = clone(planOf(fy) || {});
     const p = $('[data-panel="plan"]');
     if (!$('[data-pg]', p)) return base;
-    base.groups = {}; base.carryGroups = {}; base.pct = []; base.carryCum = [];
+    base.groups = {}; base.carryGroups = {};
     $$('[data-pg]', p).forEach(function (i) { base.groups[i.getAttribute('data-pg')] = numIn(i.value); });
     $$('[data-cg]', p).forEach(function (i) { base.carryGroups[i.getAttribute('data-cg')] = numIn(i.value); });
-    $$('[data-pct]', p).forEach(function (i) { base.pct[Number(i.getAttribute('data-pct'))] = i.value === '' ? null : Number(i.value); });
-    $$('[data-cc]', p).forEach(function (i) { base.carryCum[Number(i.getAttribute('data-cc'))] = i.value === '' ? null : numIn(i.value); });
     base.carryMk = $('#carryMk').value;
     return base;
   }
@@ -1003,7 +1002,7 @@
     let h = '<div class="card"><div class="card-head"><h2>แผนงบประมาณบำรุงปกติ ปีงบประมาณ ' + fy + '</h2><div class="sp"></div>' +
       (can ? '<button class="btn btn-primary" id="savePlan">บันทึกแผน</button>' : '<span class="pill info">แก้ไขได้เฉพาะเจ้าของระบบ/ผู้ดูแลระบบ</span>') + '</div>' +
       (can ? '<div class="drop" id="planDrop" style="margin-bottom:14px"><b>นำเข้าไฟล์รายงานแผน-ผลจากระบบของแขวง (เช่น report01.csv)</b><br><span class="small muted">ระบบจะกรอกแผน และผลสะสมถึงเดือน ' + esc(RE.mkLabel(S.mk)) + ' ตามกลุ่มงานให้อัตโนมัติ</span></div>' : '') +
-      '<div class="grid2"><div><h3 style="margin-bottom:8px">แผนและผลตามกลุ่มงาน</h3><div class="tbl-wrap"><table class="tbl"><tr><th>กลุ่มงาน</th><th class="num">แผน (บาท)</th><th class="num">ผลสะสมยกมา</th><th class="num">ผลสะสม ณ ' + esc(RE.mkShort(S.mk)) + '</th></tr>';
+      '<div><h3 style="margin-bottom:8px">แผนและผลตามกลุ่มงาน</h3><div class="tbl-wrap"><table class="tbl"><tr><th>กลุ่มงาน</th><th class="num">แผน (บาท)</th><th class="num">ผลสะสมยกมา</th><th class="num">ผลสะสม ณ ' + esc(RE.mkShort(S.mk)) + '</th></tr>';
     RE.GROUPS.forEach(function (g) {
       h += '<tr><td><span class="pill" style="background:#' + g.color + ';color:#fff">' + g.code + '</span> ' + esc(g.name) + '</td>' +
         '<td><input type="text" inputmode="decimal" class="num" data-pg="' + g.code + '" value="' + esc(fmtIn((plan.groups || {})[g.code])) + '"' + dis + '></td>' +
@@ -1013,23 +1012,16 @@
     h += '<tr class="tot"><td>รวม</td><td class="num" id="planTot">' + RE.fmt(cum.planTotal) + '</td><td></td><td class="num" id="resTot">' + RE.fmt(cum.resultTotal) + '</td></tr></table></div>' +
       '<div style="margin-top:14px"><label class="f">ข้อมูลก่อนเริ่มใช้ระบบนี้: มีผลสะสมจากระบบแขวงถึงเดือน</label><select id="carryMk"' + dis + '><option value="">ไม่มี — เริ่มใช้ระบบตั้งแต่ ต.ค. (ต้นปีงบ)</option>' +
       months.map(function (m) { return '<option value="' + m + '"' + (m === plan.carryMk ? ' selected' : '') + '>' + RE.mkLabel(m) + '</option>'; }).join('') + '</select>' +
-      '<p class="small muted">ถ้าเริ่มใช้ระบบกลางปีงบ ให้เลือกเดือนสุดท้ายที่ยังไม่ได้นำเข้า CSV แล้วกรอก "ผลสะสมยกมา" รายกลุ่ม และผลสะสมรายเดือน (จากระบบของแขวง) — เดือนหลังจากนั้นระบบคำนวณจาก CSV ที่นำเข้าเอง</p></div></div>' +
-      '<div><h3 style="margin-bottom:8px">แผน-ผลสะสมรายเดือน (ใช้ทำกราฟความก้าวหน้า)</h3><div class="tbl-wrap"><table class="tbl"><tr><th>เดือน</th><th class="num">แผนสะสม (%)</th><th class="num">ผลสะสม (บาท)</th><th class="num">ผล (%)</th></tr>';
-    months.forEach(function (m, i) {
-      const manual = i <= carryIdx;
-      const v = cum.cum[i];
-      h += '<tr><td>' + esc(RE.mkShort(m)) + '</td><td><input type="number" step="0.01" class="num" style="width:110px" data-pct="' + i + '" value="' + esc(((plan.pct || [])[i] == null ? '' : plan.pct[i])) + '"' + dis + '></td>' +
-        '<td class="num">' + (manual ? '<input type="text" inputmode="decimal" class="num" data-cc="' + i + '" value="' + esc(fmtIn((plan.carryCum || [])[i])) + '"' + dis + '>' : (v == null ? '<span class="muted">—</span>' : RE.fmt(v))) + '</td>' +
-        '<td class="num">' + (v == null || !cum.planTotal ? '—' : RE.fmt(v / cum.planTotal * 100)) + '</td></tr>';
-    });
-    h += '</table></div><p class="small muted">แผนสะสม (%) ให้กรอกตามแผนการใช้จ่ายของแขวง (เส้นสีส้มในกราฟ)</p></div></div></div>' +
-      '<div class="grid2"><div class="card"><h3 style="margin-bottom:10px">ตัวอย่าง: แผน-ผล ตามรหัสงาน</h3><div id="planPrev1"></div></div>' +
-      '<div class="card"><h3 style="margin-bottom:10px">ตัวอย่าง: ความก้าวหน้าการใช้งบประมาณ</h3><div id="planPrev2"></div>' +
+      '<p class="small muted">ถ้าเริ่มใช้ระบบกลางปีงบ ให้เลือกเดือนสุดท้ายที่ยังไม่ได้นำเข้า CSV แล้วกรอก "ผลสะสมยกมา" รายกลุ่ม (จากระบบของแขวง) — เดือนหลังจากนั้นระบบคำนวณจาก CSV ที่นำเข้าเอง</p></div></div></div>' +
+      // ตัวอย่าง 3 หน้าเรียงบนลงล่าง (ตามลำดับในไฟล์ PowerPoint) — ภาพใหญ่ ตรวจง่าย
+      '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 1: สรุปผลงานบำรุงปกติ ประจำเดือน</h3><div id="planPrev0"></div></div>' +
+      '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 2: แผน-ผล ตามรหัสงาน</h3><div id="planPrev1"></div></div>' +
+      '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 3: ความก้าวหน้าการใช้งบประมาณ</h3><div id="planPrev2"></div>' +
       '<div class="drop small" style="margin-top:10px" data-pdrop-budget="1"><b>+ เพิ่มรูปกราฟ</b> — แคปกราฟจากระบบของกรมแล้วลากมาวาง หรือคลิกเลือก (รูปใหม่จะแทนรูปเดิม)</div>' +
       (photosOf('budget').length ? thumbsHtml('budget') : '') +
       '<label class="f" style="margin-top:12px">ข้อความใต้กราฟ บรรทัดที่ 1 (ระบบอ่านจากรูปให้ แก้ได้)</label><input type="text" id="budgetLine1" value="' + esc(rep().budgetLine1 || '') + '">' +
       '<label class="f" style="margin-top:8px">บรรทัดที่ 2</label><input type="text" id="budgetLine2" value="' + esc(rep().budgetLine2 || '') + '">' +
-      '</div></div>';
+      '</div>';
     p.innerHTML = h;
     bindThumbs(p);
     bindDrop($('[data-pdrop-budget]', p), 'image/*', false, addBudgetImage);
@@ -1070,19 +1062,14 @@
     });
     h += '<tr class="tot"><td>รวม</td><td class="num">' + RE.fmt(r.planTotal) + '</td><td class="num">' + RE.fmt(r.resultTotal) + '</td><td class="num">' + (r.planTotal ? RE.fmt(r.resultTotal / r.planTotal * 100) + '%' : '—') + '</td></tr></table></div>';
     if (warn.length) h += '<p class="small" style="color:#B03A2E">⚠ ' + warn.map(esc).join('<br>⚠ ') + '</p>';
-    h += '<p class="small muted">ถ้าไฟล์นี้ไม่ใช่ข้อมูลถึงเดือน ' + esc(RE.mkLabel(S.mk)) + ' ให้กดยกเลิก แล้วเปลี่ยนเดือนด้านบนก่อน · แผนสะสม (%) รายเดือนที่กรอกไว้จะคงเดิม</p>';
+    h += '<p class="small muted">ถ้าไฟล์นี้ไม่ใช่ข้อมูลถึงเดือน ' + esc(RE.mkLabel(S.mk)) + ' ให้กดยกเลิก แล้วเปลี่ยนเดือนด้านบนก่อน</p>';
     if (csvMonths.length) h += '<p class="small muted">เดือน ' + csvMonths.map(RE.mkShort).join(', ') + ' มีผลงานจาก Export_CSV อยู่แล้ว — ยอดแผน-ผลจะใช้ตัวเลขจากไฟล์นี้แทน (ข้อมูลผลงานรายไฟล์ไม่ถูกลบ)</p>';
     if (!await modal({ title: 'นำเข้ารายงานแผน-ผล', html: h, ok: 'บันทึกแผน-ผล', wide: true })) return;
     const d = readPlanForm(fy);
     d.groups = r.plan;
     d.carryMk = S.mk;
     d.carryGroups = r.result;
-    // Firestore ไม่รับช่องว่าง (undefined) ในอาร์เรย์ — เติม null ให้ครบทุกเดือนถึงเดือนนี้
-    const oldCum = d.carryCum || [];
-    d.carryCum = [];
-    for (let i = 0; i <= upto; i++) d.carryCum.push(i === upto ? r.resultTotal : (oldCum[i] == null ? null : oldCum[i]));
-    d.pct = (d.pct || []).slice(0, 12);
-    for (let i = 0; i < 12; i++) if (d.pct[i] === undefined || (typeof d.pct[i] === 'number' && !isFinite(d.pct[i]))) d.pct[i] = null;
+    delete d.pct; delete d.carryCum;   // ช่องแผน-ผลสะสมรายเดือนเลิกใช้แล้ว
     d.planSource = { file: f.name, mk: S.mk, importedAt: FBL.nowIso(), importedBy: FBL.user.name };
     run(function () { return FBL.set('plans', String(fy), Object.assign(d, { fy: fy, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name })); }, 'อัปเดตแผน-ผลจากไฟล์แล้ว').then(renderPlan);
   }
@@ -1116,6 +1103,10 @@
     if ($('#planTot')) $('#planTot').textContent = RE.fmt(cum.planTotal);
     if ($('#resTot')) $('#resTot').textContent = RE.fmt(cum.resultTotal);
     RE.GROUPS.forEach(function (g) { const c = $('[data-res="' + g.code + '"]'); if (c) c.textContent = RE.fmt(cum.groups[g.code] || 0); });
+    if ($('#planPrev0')) {
+      const aggs = RE.aggregate(monthRecords());
+      $('#planPrev0').innerHTML = aggs.length ? slideHtml(RE.slideMonthSummary(S.mk, aggs)) : '<p class="muted">ยังไม่มีผลงานของเดือน ' + esc(RE.mkLabel(S.mk)) + ' — นำเข้า Export_CSV ในแท็บ ① ก่อน</p>';
+    }
     if ($('#planPrev1')) $('#planPrev1').innerHTML = slideHtml(RE.slidePlan(S.mk, plan, cum));
     if ($('#planPrev2')) $('#planPrev2').innerHTML = slideHtml(RE.slideBudget(S.mk, plan, cum, budgetImg(), budgetLines()));
   }
