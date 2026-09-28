@@ -32,7 +32,8 @@
   ];
   RE.groupOf = function (code) { return String(code).slice(0, 3) + '00'; };
 
-  // หน่วยนับเริ่มต้นของแต่ละรหัสงาน (แก้ได้ในหน้ารายงาน และจำต่อไปเดือนถัดไป)
+  // หน่วยนับสำรอง — ใช้เฉพาะตอนอ่านฐานข้อมูลกลาง CN-Hub ไม่ได้
+  // (ปกติหน่วยนับมาจากฐานข้อมูลกลาง แท็บรหัสงาน: CNMaster.unitsOf(code) ซึ่ง 1 รหัสงานอาจมีหลายหน่วย)
   RE.DEFAULT_UNITS = {
     '21112': 'ตร.ม.', '21114': 'ตร.ม.', '21131': 'ตร.ม.', '21311': 'ม.', '21322': 'ตร.ม.',
     '21422': 'ม.', '21521': 'ตร.ม.', '21522': 'ตร.ม.', '21530': 'ต้น', '21570': 'ตร.ม.', '21660': 'งาน'
@@ -233,6 +234,14 @@
             if (k[1] != null && !CNMaster.findRoute(rec.route, k[1])) W('กม.' + k[0] + ' ' + k[2] + ' อยู่นอกช่วง กม. ที่หมวดรับผิดชอบของ ทล.' + rec.route);
           });
         }
+      }
+    } catch (e) { /* ข้ามถ้าฐานกลางยังไม่พร้อม */ }
+    // รหัสงานต้องมีในฐานข้อมูลกลาง (ใช้กำหนดหน่วยนับ)
+    try {
+      if (window.CNMaster && CNMaster.workCodes && CNMaster.workCodes().length) {
+        const wc = CNMaster.findWorkCode(rec.code);
+        if (!wc) W('รหัสงาน ' + rec.code + ' ไม่มีในฐานข้อมูลกลาง (แท็บรหัสงาน) — หน่วยนับจะต้องพิมพ์เอง');
+        else if (!(wc.units || []).length) W('รหัสงาน ' + rec.code + ' เป็นหัวข้อหมวดในฐานข้อมูลกลาง ไม่ใช่รหัสที่ลงผลงานได้');
       }
     } catch (e) { /* ข้ามถ้าฐานกลางยังไม่พร้อม */ }
 
@@ -630,31 +639,36 @@
       els.push({ type: 'photo', id: p.id, pw: p.w, ph: p.h, fx: p.fx, fy: p.fy, x: c.x, y: c.y, w: c.w, h: c.h });
     });
 
-    // กล่องค่าใช้จ่าย
-    const cx = 13.65, cy = 3.71;
-    els.push({ type: 'rect', x: cx, y: cy, w: 5.76, h: 6.56, fill: 'FFFFFF', line: 'FAC02E', lineW: 7, radius: 0.28 });
-    els.push({ type: 'rect', x: 14.55, y: 3.43, w: 3.95, h: 0.64, fill: 'FFE7B0', radius: 0.1, shadow: true, text: 'ค่าใช้จ่ายในการปฏิบัติงาน', size: 16, color: INK });
+    // กล่องค่าใช้จ่าย — ตำแหน่ง/ขนาดตัวอักษรวัดจากต้นฉบับ (รายงานเดือน มิ.ย. 69):
+    // Prompt 16pt, ระยะบรรทัดคงที่ 24.76pt, ระยะห่างตัวอักษร 1.06pt, ชิดบน ไม่มีขอบใน
+    // (กล่องตัวเลขขยายไปทางซ้ายเผื่อยอดหลักล้าน — ขอบขวาตรงต้นฉบับ)
+    const BLK = '000000';
+    const T16 = { size: 16, color: BLK, lineSpacingPt: 24.76, charSpacing: 1.06, inset: 0 };
+    const tx = function (o) { return Object.assign({ type: 'text' }, T16, o); };
+    els.push({ type: 'rect', x: 13.667, y: 4.054, w: 5.665, h: 6.206, fill: 'FFFFFF', line: 'FAC02E', lineW: 9, radius: 0.15 });
+    els.push({ type: 'rect', x: 14.551, y: 3.727, w: 3.943, h: 0.868, fill: 'FFE7B0', radius: 0.1, shadow: true });
+    els.push({ type: 'text', x: 14.821, y: 3.958, w: 3.403, h: 0.5, text: 'ค่าใช้จ่ายในการปฏิบัติงาน', size: 20, color: BLK, align: 'center', lineSpacingPt: 31.89, inset: 0 });
     const rows = [['ค่าวัสดุ', a.mat], ['ค่าแรงงาน', a.lab], ['ค่าเช่าเครื่องจักร', a.rent], ['ค่าน้ำมันเชื้อเพลิง', a.fuel]];
+    const rowY = [4.987, 5.707, 6.418, 7.074], valY = [5.01, 5.73, 6.444, 7.1], chkY = [4.971, 5.691, 6.402, 7.058];
+    const lineY = [5.493, 6.204, 6.924, 7.576];
     rows.forEach(function (r, i) {
-      const y = 4.45 + i * 0.7;
-      els.push({ type: 'ellipse', x: 14.02, y: y + 0.07, w: 0.34, h: 0.34, fill: 'FFFFFF', line: '555555', lineW: 1, text: '✓', size: 13, bold: true, color: RED });
-      els.push({ type: 'text', x: 14.5, y: y, w: 2.3, h: 0.48, text: r[0], size: 15, color: INK, valign: 'middle' });
-      els.push({ type: 'text', x: 16.4, y: y, w: 1.75, h: 0.48, text: RE.fmt(r[1]), size: 15, color: INK, align: 'right', valign: 'middle' });
-      els.push({ type: 'text', x: 18.35, y: y, w: 0.75, h: 0.48, text: 'บาท', size: 15, color: INK, valign: 'middle' });
-      els.push({ type: 'line', x: 13.98, y: y + 0.58, w: 5.1, color: '444444', lineW: 0.75 });
+      els.push({ type: 'ellipse', x: 14.035, y: chkY[i], w: 0.32, h: 0.32, fill: 'FFFFFF', line: '555555', lineW: 1, text: '✓', size: 13, bold: true, color: RED });
+      els.push(tx({ x: 14.594, y: rowY[i], w: 2.776, h: 0.4, text: r[0] }));
+      els.push(tx({ x: 16.2, y: valY[i], w: 2.518, h: 0.4, text: RE.fmt(r[1]) + '  บาท', align: 'right' }));
+      els.push({ type: 'line', x: 14.013, y: lineY[i], w: 4.942, color: '444444', lineW: 0.75 });
     });
     const perDayTxt = a.perDay >= 100 ? RE.fmt(a.perDay, 0) : RE.fmt(a.perDay, 2);
+    // [หัวข้อ, ค่า, หน่วย, สีค่า, y หัวข้อ, y ค่า, y หน่วย, x หน่วย, หน่วยตัวหนา+เอียง]
     const tot = [
-      ['รวม', RE.fmt(a.total), 'บาท', INK, true],
-      ['Unit Cost', RE.fmt(a.unitCost), 'บาท/' + unit, RED, false],
-      ['ผลงานเฉลี่ย', perDayTxt, unit + '/วัน', RED, false]
+      ['รวม', RE.fmt(a.total), 'บาท', BLK, 7.884, 7.892, 7.875, 17.73, true],
+      ['Unit Cost', RE.fmt(a.unitCost), 'บาท/' + unit, RED, 8.371, 8.378, 8.378, 17.73, false],
+      ['ผลงานเฉลี่ย', perDayTxt, unit + '/วัน', RED, 8.871, 8.868, 8.869, 17.734, false]
     ];
-    els.push({ type: 'ellipse', x: 13.98, y: 7.38, w: 0.5, h: 0.5, fill: 'FAC02E', line: 'E09A00', lineW: 1.5, text: '★', size: 15, bold: true, color: 'FFFFFF' });
-    tot.forEach(function (t, i) {
-      const y = 7.35 + i * 0.6;
-      els.push({ type: 'text', x: 14.6, y: y, w: 1.8, h: 0.5, text: t[0], size: 15, bold: true, color: INK, valign: 'middle' });
-      els.push({ type: 'text', x: 16.0, y: y, w: 2.05, h: 0.5, text: t[1], size: 15, bold: true, color: t[3], align: 'right', valign: 'middle' });
-      els.push({ type: 'text', x: 18.2, y: y, w: 1.2, h: 0.5, text: t[2], size: 13, bold: true, italic: t[4], color: INK, valign: 'middle' });
+    els.push({ type: 'ellipse', x: 13.898, y: 7.784, w: 0.5, h: 0.5, fill: 'FAC02E', line: 'E09A00', lineW: 1.5, text: '★', size: 15, bold: true, color: 'FFFFFF' });
+    tot.forEach(function (t) {
+      els.push(tx({ x: 14.594, y: t[4], w: 2.591, h: 0.4, text: t[0], bold: true }));
+      els.push(tx({ x: 15.2, y: t[5], w: 2.268, h: 0.4, text: t[1], bold: true, color: t[3], align: 'right' }));
+      els.push(tx({ x: t[7], y: t[6], w: 1.6, h: 0.4, text: t[2], bold: t[8], italic: t[8] }));
     });
     return { kind: 'work', title: a.code + ' ' + a.name, els: els, layout: lay };
   };
@@ -827,8 +841,10 @@
 
     const textOpts = function (e) {
       const o = { x: e.x, y: e.y, w: e.w, h: e.h, fontFace: FONT, fontSize: e.size || 16, color: e.color || INK,
-        bold: !!e.bold, italic: !!e.italic, align: e.align || 'left', valign: e.valign || 'top', margin: 0.04, fit: 'none' };
+        bold: !!e.bold, italic: !!e.italic, align: e.align || 'left', valign: e.valign || 'top', margin: e.inset != null ? e.inset : 0.04, fit: 'none' };
       if (e.lineSpacing) o.lineSpacingMultiple = e.lineSpacing;
+      if (e.lineSpacingPt) o.lineSpacing = e.lineSpacingPt;   // ระยะบรรทัดคงที่ (pt)
+      if (e.charSpacing) o.charSpacing = e.charSpacing;       // ระยะห่างตัวอักษร (pt)
       if (e.glow) o.glow = { size: 12, opacity: 0.85, color: 'FFFFFF' };
       return o;
     };
