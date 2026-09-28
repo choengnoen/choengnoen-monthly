@@ -214,6 +214,10 @@
   };
 
   let suppressAuthEvents = false;
+  let authSeq = 0;          // นับเหตุการณ์ล็อกอิน/ออก — ผลที่มาช้ากว่าเหตุการณ์ล่าสุดทิ้งไป
+  let teamUnsub = null;     // เฝ้าดูรายชื่อของผู้ที่ล็อกอินอยู่ (ถูกลบ/ตั้งรหัสใหม่ = ออกจากระบบ)
+  let kickMsg = null;
+  function stopTeamWatch() { if (teamUnsub) { teamUnsub(); teamUnsub = null; } }
   FBL.onAuth = function (cb) {
     if (FBL.demo) {
       let on = false;
@@ -225,9 +229,12 @@
     }
     FBL._auth.onAuthStateChanged(async function (u) {
       if (suppressAuthEvents) return;
-      if (!u) { FBL.user = null; cb(null); return; }
+      const seq = ++authSeq;
+      stopTeamWatch();
+      if (!u) { FBL.user = null; const m = kickMsg; kickMsg = null; cb(null, m); return; }
       try {
         const d = await FBL._db.collection('team').doc(u.uid).get();
+        if (seq !== authSeq) return;
         if (!d.exists) {
           FBL.user = null;
           await FBL._auth.signOut();
@@ -235,8 +242,19 @@
           return;
         }
         FBL.user = { uid: u.uid, name: d.data().name, isOwner: !!d.data().isOwner, isAdmin: !!d.data().isAdmin };
+        teamUnsub = FBL._db.collection('team').doc(u.uid).onSnapshot(function (s) {
+          if (s.exists || s.metadata.fromCache || !FBL.user || FBL.user.uid !== u.uid) return;
+          kickMsg = 'บัญชีนี้ถูกลบหรือถูกตั้งรหัสผ่านใหม่ กรุณาเข้าสู่ระบบอีกครั้ง';
+          FBL.logout();
+        }, function () { /* ข้าม */ });
         cb(FBL.user);
-      } catch (e) { FBL.user = null; cb(null, thErr(e)); }
+      } catch (e) {
+        if (seq !== authSeq) return;
+        FBL.user = null;
+        // ต้องออกจาก Firebase Auth ด้วย: ถ้าค้างไว้ ล็อกอินชื่อเดิมซ้ำ Firebase จะไม่แจ้งเหตุการณ์ (uid เดิม) ปุ่มเข้าสู่ระบบจะเงียบ
+        try { await FBL._auth.signOut(); } catch (_) { /* ข้าม */ }
+        cb(null, thErr(e));
+      }
     });
   };
 
@@ -247,13 +265,23 @@
       if (FBL._demoCb) FBL._demoCb(FBL.user);
       return;
     }
-    const m = team.find(function (x) { return x.name === String(name || '').trim(); });
+    name = String(name || '').trim();
+    const find = function () { return team.find(function (x) { return x.name === name; }); };
+    const reload = function () { return FBL.loadTeam().then(find, function () { return null; }); };
+    const m = find() || await reload();
     if (!m) throw new Error('ไม่พบชื่อนี้ในระบบ');
     try { await FBL._auth.signInWithEmailAndPassword(m.email, password); }
-    catch (e) { throw new Error(thErr(e)); }
+    catch (e) {
+      // รายชื่อในหน้านี้อาจเก่า (เจ้าของระบบเพิ่งตั้งรหัสผ่านใหม่ = บัญชีล็อกอินใหม่) — โหลดใหม่แล้วลองอีกครั้ง
+      const again = await reload();
+      if (!again || again.email === m.email) throw new Error(thErr(e));
+      try { await FBL._auth.signInWithEmailAndPassword(again.email, password); }
+      catch (e2) { throw new Error(thErr(e2)); }
+    }
   };
 
   FBL.logout = async function () {
+    stopTeamWatch();
     FBL.stopAll();
     if (FBL.demo) {
       try { sessionStorage.removeItem('cn-monthly-demo-login'); } catch (e) { /* ข้าม */ }

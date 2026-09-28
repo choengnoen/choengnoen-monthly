@@ -189,8 +189,13 @@
   /* ======================================================================
      ล็อกอิน
      ====================================================================== */
+  let teamReady = false;    // ยังโหลดรายชื่อไม่เสร็จ = ยังกดเข้าสู่ระบบไม่ได้
+  function resetLoginBtn() { $('#loginBtn').disabled = !teamReady; $('#loginBtn').textContent = 'เข้าสู่ระบบ'; }
+  function loginWait(msg) { $('#loginWait').textContent = msg; $('#loginScreen').classList.add('checking'); }
+
   async function initLogin() {
     if (FBL.demo) { $('#demoNote').classList.remove('hidden'); $('#loginPwWrap').classList.add('hidden'); }
+    resetLoginBtn();
     try {
       const team = await FBL.loadTeam();
       // เหมือนระบบงานอุบัติเหตุ: ขึ้น "— เลือกชื่อของคุณ —" ไว้ก่อน ไม่เลือกชื่อใครไว้ให้ล่วงหน้า
@@ -198,15 +203,17 @@
         team.map(function (t) { return '<option value="' + esc(t.name) + '">' + esc(t.name) + '</option>'; }).join('');
       if (!FBL.demo && await FBL.needsBootstrap()) { $('#loginForm').classList.add('hidden'); $('#bootForm').classList.remove('hidden'); }
     } catch (e) { $('#loginErr').textContent = FBL.errorText(e); }
+    finally { teamReady = true; if (!$('#loginBtn').textContent.startsWith('กำลัง')) resetLoginBtn(); }
     $('#loginForm').onsubmit = async function (ev) {
       ev.preventDefault();
       $('#loginErr').textContent = '';
       if (!$('#loginName').value) { $('#loginErr').textContent = 'เลือกชื่อของคุณก่อน'; return; }
       if (!FBL.demo && !$('#loginPw').value) { $('#loginErr').textContent = 'กรอกรหัสผ่าน'; return; }
+      // สำเร็จแล้วปุ่มยังล็อกไว้ จนกว่า onAuth จะเปิดระบบหรือแจ้งข้อผิดพลาด (กันกดซ้ำระหว่างรอ)
       $('#loginBtn').disabled = true;
+      $('#loginBtn').textContent = 'กำลังเข้าสู่ระบบ…';
       try { await FBL.login($('#loginName').value, $('#loginPw').value); }
-      catch (e) { $('#loginErr').textContent = e.message; }
-      finally { $('#loginBtn').disabled = false; }
+      catch (e) { $('#loginErr').textContent = e.message; resetLoginBtn(); }
     };
     $('#bootForm').onsubmit = async function (ev) {
       ev.preventDefault();
@@ -216,35 +223,47 @@
     };
   }
 
-  let started = false;
+  let started = false, session = 0, masterHooked = false;
   FBL.onError = function (m) { toast(m, 'err'); };
   FBL.onAuth(function (user, err) {
     if (user) { startApp(); return; }
+    session++;
     started = false;
     $('#app').classList.add('hidden');
-    $('#loginScreen').classList.remove('hidden');
+    $('#loginScreen').classList.remove('hidden', 'checking');
+    $('#loginPw').value = '';
+    resetLoginBtn();
     if (err) $('#loginErr').textContent = err;
   });
 
   async function startApp() {
     if (started) return;
     started = true;
-    $('#loginScreen').classList.add('hidden');
-    $('#app').classList.remove('hidden');
-    // แบบเดียวกับระบบควบคุมงานโครงการ: ผู้บันทึก: ชื่อ 👑 (เจ้าของระบบ) / 🛡️ (ผู้ดูแลระบบ)
-    $('#whoName').textContent = 'ผู้บันทึก: ' + FBL.user.name + (FBL.user.isOwner ? ' 👑' : FBL.user.isAdmin ? ' 🛡️' : '');
-    $('#whoName').title = FBL.user.isOwner ? 'เจ้าของระบบ' : (FBL.user.isAdmin ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน');
+    const my = ++session;
+    // โหลดข้อมูลให้เสร็จก่อนค่อยสลับหน้า — ไม่ให้เห็นหน้าระบบว่าง ๆ แล้วค่อยกระโดดเป็นข้อมูล
+    loginWait('กำลังโหลดข้อมูล…');
     const onChange = function (col, docs) { S[col] = docs; if (col === 'photos') S.photos.forEach(function (p) { p.id = p.__id; }); scheduleRender(col); };
     const got = await Promise.all(['reports', 'records', 'photos', 'plans'].map(function (c) { return FBL.watch(c, onChange); }));
+    if (my !== session || !FBL.user) return;   // ออกจากระบบไประหว่างโหลด
     S.reports = got[0]; S.records = got[1]; S.photos = got[2]; S.plans = got[3];
     S.photos.forEach(function (p) { p.id = p.__id; });
     const last = lsGet('cn-monthly-mk');
     const ids = S.reports.map(function (r) { return r.__id; }).sort();
     S.mk = ids.indexOf(last) >= 0 ? last : (ids[ids.length - 1] || '');
-    if (window.CNMaster && CNMaster.ready) {
-      CNMaster.ready.then(function () { renderAll(); }).catch(function () {});
-      CNMaster.onChange(function (w) { if (w === 'routes' || w === 'workcodes') renderAll(); });
+    // แบบเดียวกับระบบควบคุมงานโครงการ: ผู้บันทึก: ชื่อ 👑 (เจ้าของระบบ) / 🛡️ (ผู้ดูแลระบบ)
+    $('#whoName').textContent = 'ผู้บันทึก: ' + FBL.user.name + (FBL.user.isOwner ? ' 👑' : FBL.user.isAdmin ? ' 🛡️' : '');
+    $('#whoName').title = FBL.user.isOwner ? 'เจ้าของระบบ' : (FBL.user.isAdmin ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน');
+    // ผูกกับฐานข้อมูลกลางครั้งเดียวพอ — ถ้าผูกทุกครั้งที่ล็อกอิน ออก-เข้าหลายรอบจะวาดหน้าซ้ำหลายเท่า
+    if (!masterHooked && window.CNMaster && CNMaster.ready) {
+      masterHooked = true;
+      CNMaster.ready.then(function () { if (started) renderAll(); }).catch(function () {});
+      CNMaster.onChange(function (w) { if (started && (w === 'routes' || w === 'workcodes')) renderAll(); });
     }
+    $('#loginPw').value = '';
+    resetLoginBtn();
+    $('#loginScreen').classList.add('hidden');
+    $('#loginScreen').classList.remove('checking');
+    $('#app').classList.remove('hidden');
     renderAll();
   }
 
@@ -270,7 +289,7 @@
   $('#monthSel').onchange = function () { S.mk = this.value; lsSet('cn-monthly-mk', S.mk); S.pending = null; S.probDraft = null; renderAll(); };
   $('#newMonthBtn').onclick = newMonth;
   $('#firstMonthBtn').onclick = newMonth;
-  $('#logoutBtn').onclick = function () { FBL.logout(); };
+  $('#logoutBtn').onclick = function () { FBL.logout().catch(function (e) { toast(FBL.errorText(e), 'err'); }); };
 
   function renderHeader() {
     const ids = S.reports.map(function (r) { return r.__id; }).sort().reverse();
