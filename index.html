@@ -179,6 +179,17 @@ table.pend tr.skip td:last-child{opacity:1}
 .slide .el-photo{background-repeat:no-repeat;background-color:#cfd8e3}
 .slide .el-ph{border:2px dashed #9fb3c8;display:grid;place-items:center;color:#6d8199;background:rgba(255,255,255,.55);font-family:'Sarabun'}
 .slide .el-chart{background:#fff}
+/* ส่งออก PDF: พิมพ์สไลด์ทั้งหมดหน้าละ 1 สไลด์ ขนาดเท่าไฟล์ PowerPoint (20 x 11.25 นิ้ว) */
+#printRoot{display:none}
+@media print{
+  @page{size:20in 11.25in;margin:0}
+  html,body{margin:0!important;padding:0!important;background:#fff!important}
+  body.printing>*:not(#printRoot){display:none!important}
+  body.printing #printRoot{display:block}
+  #printRoot .slide{width:20in;height:11.25in;aspect-ratio:auto;border-radius:0;box-shadow:none;page-break-after:always;break-after:page;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #printRoot .slide:last-child{page-break-after:auto;break-after:auto}
+}
 .slide .el-photo.sel{outline:3px solid var(--gold);z-index:3}
 
 /* งานรายรหัส */

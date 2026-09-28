@@ -148,10 +148,10 @@
       '<rect x="52" y="' + (Y1 + 7) + '" width="3" height="1" fill="#1E7B1E"/><text x="56" y="' + (Y1 + 8) + '" font-size="2.4">ผล</text>';
     return '<svg viewBox="0 0 100 60" width="100%" height="100%" preserveAspectRatio="none">' + out + '</svg>';
   }
-  function slideHtml(spec) {
+  function slideHtml(spec, fullUrls) {
     spec = RE.withLogo(spec, settings().logo);   // ตรามุมซ้ายบนของกรอบ (ถ้าอัปโหลดตราไว้)
     const thumbs = {};
-    S.photos.forEach(function (p) { thumbs[p.__id] = p.thumb; });
+    S.photos.forEach(function (p) { thumbs[p.__id] = (fullUrls && fullUrls[p.__id]) || p.thumb; });   // fullUrls = รูปเต็ม (ใช้ตอนส่งออก PDF)
     let h = '';
     let bg = '';
     // ขอบนุ่มของรูป (ไล่เป็นสีขาว) — แบบเดียวกับที่ใส่ในไฟล์ PowerPoint
@@ -1167,7 +1167,8 @@
       ck(!!budgetImg(), budgetImg() ? 'กราฟความก้าวหน้า: ใช้รูปที่ใส่ไว้' : 'ยังไม่ได้ใส่รูปกราฟความก้าวหน้า — ข้ามสไลด์นี้ (เพิ่มได้ที่แท็บ ④)', true) +
       ck(true, (r.problems || []).length ? 'ปัญหาอุปสรรค ' + r.problems.length + ' เรื่อง / ' + probPts + ' จุด' : 'ไม่มีปัญหาอุปสรรค (ไม่มีสไลด์หน้านี้)') +
       '</ul></div><div><label class="f">ชื่อไฟล์</label><input type="text" id="outName" value="' + esc(defaultFileName()) + '">' +
-      '<div class="row" style="margin-top:12px"><button class="btn btn-gold" id="doExport"' + (recs.length ? '' : ' disabled') + '>⬇ ส่งออก PowerPoint (' + specs.length + ' สไลด์)</button></div>' +
+      '<div class="row" style="margin-top:12px"><button class="btn btn-gold" id="doExport"' + (recs.length ? '' : ' disabled') + '>⬇ ส่งออก PowerPoint (' + specs.length + ' สไลด์)</button>' +
+      '<button class="btn" id="doPdf"' + (recs.length ? '' : ' disabled') + '>⬇ ส่งออก PDF</button></div>' +
       '<div id="expProg" class="hidden" style="margin-top:12px"><div class="progress"><div style="width:0"></div></div><div class="small muted" id="expTxt"></div></div>' +
       '<p class="small muted">ไฟล์ใช้ฟอนต์ Prompt เหมือนรายงานเดิม — เครื่องที่ใช้นำเสนอควรติดตั้งฟอนต์ Prompt ไว้ · กราฟในไฟล์เป็นกราฟของ PowerPoint แก้ตัวเลขต่อได้</p></div></div></div>' +
       '<div class="card"><div class="card-head"><h2>ตัวอย่างสไลด์ทั้งหมด</h2></div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">' +
@@ -1179,6 +1180,7 @@
     // เริ่มโหลดรูปจาก Drive เงียบ ๆ ตั้งแต่เปิดแท็บนี้ — พอกดส่งออกรูปส่วนใหญ่จะพร้อมแล้ว
     if (FBL.photoStore === 'drive' && !S.exporting) FBL.prefetchPhotos(photoIdsOf(specs));
     $('#doExport').onclick = doExport;
+    $('#doPdf').onclick = doPdf;
     $('#clearPhotos').onclick = async function () {
       if (await confirmBox('ลบรูปทั้งหมดของเดือนนี้?', '<p>' + monthPhotos.length + ' รูปจะถูกลบจากระบบ — ส่งออกไฟล์ PowerPoint เก็บไว้แล้วใช่ไหม?</p><p class="small muted">ตัวเลขผลงานไม่ถูกลบ</p>', 'ลบรูป', true))
         run(function () { return FBL.deletePhotos(monthPhotos.map(function (x) { return x.__id; })); }, 'ลบรูปแล้ว');
@@ -1188,6 +1190,61 @@
     const ids = [];
     specs.forEach(function (s) { (s.els || []).forEach(function (e) { if (e.type === 'photo' && ids.indexOf(e.id) < 0) ids.push(e.id); }); });
     return ids;
+  }
+  // ส่งออก PDF: วาดสไลด์ทั้งหมดด้วยตัวแสดงตัวอย่างเดียวกับหน้าจอ แล้วเปิดหน้าต่างพิมพ์ของเบราว์เซอร์ → เลือก "บันทึกเป็น PDF"
+  async function doPdf() {
+    if (S.exporting) return;
+    S.exporting = true;
+    const btn = $('#doPdf');
+    btn.disabled = true;
+    $('#expProg').classList.remove('hidden');
+    const bar = $('#expProg .progress>div');
+    const specs = buildSpecs();
+    const urls = {}, made = [];
+    const oldTitle = document.title;
+    try {
+      const ids = photoIdsOf(specs);
+      $('#expTxt').textContent = 'กำลังโหลดรูป ' + ids.length + ' รูป…';
+      const got = await FBL.prefetchPhotos(ids, function (n, total) {
+        bar.style.width = Math.round(n / total * 70) + '%';
+        $('#expTxt').textContent = 'กำลังโหลดรูป… ' + n + '/' + total + ' รูป';
+      });
+      ids.forEach(function (id, i) {
+        if (!got[i]) return;
+        const u = URL.createObjectURL(new Blob([got[i]], { type: 'image/jpeg' }));
+        urls[id] = u; made.push(u);
+      });
+      $('#expTxt').textContent = 'กำลังจัดหน้า PDF…';
+      let root = $('#printRoot');
+      if (!root) { root = document.createElement('div'); root.id = 'printRoot'; document.body.appendChild(root); }
+      root.innerHTML = specs.map(function (s) { return slideHtml(s, urls); }).join('');
+      // รอให้รูปพื้นหลังทุกใบโหลดเสร็จก่อนพิมพ์
+      const srcs = [];
+      root.querySelectorAll('[style*="url("]').forEach(function (el) { const m = /url\(["']?([^"')]+)/.exec(el.getAttribute('style')); if (m) srcs.push(m[1]); });
+      root.querySelectorAll('img').forEach(function (im) { srcs.push(im.src); });
+      await Promise.all(srcs.map(function (u) { return new Promise(function (res) { const im = new Image(); im.onload = im.onerror = res; im.src = u; }); }));
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
+      bar.style.width = '100%';
+      let name = ($('#outName').value.trim() || defaultFileName()).replace(/\.pptx$/i, '');
+      document.title = name;   // ชื่อไฟล์ PDF เริ่มต้นในหน้าต่างพิมพ์
+      document.body.classList.add('printing');
+      const done = function () {
+        window.removeEventListener('afterprint', done);
+        document.body.classList.remove('printing');
+        document.title = oldTitle;
+        root.innerHTML = '';
+        made.forEach(function (u) { URL.revokeObjectURL(u); });
+      };
+      window.addEventListener('afterprint', done);
+      $('#expTxt').textContent = 'เปิดหน้าต่างพิมพ์แล้ว — เลือกเครื่องพิมพ์เป็น "บันทึกเป็น PDF" (Save as PDF) แล้วกดบันทึก';
+      window.print();
+    } catch (e) {
+      console.error(e);
+      document.body.classList.remove('printing');
+      document.title = oldTitle;
+      $('#expTxt').textContent = 'ส่งออก PDF ไม่สำเร็จ: ' + (e.message || e);
+      toast(e.message || String(e), 'err');
+    } finally { S.exporting = false; btn.disabled = false; }
   }
   async function doExport() {
     if (S.exporting) return;
