@@ -422,14 +422,13 @@
     h += '<div class="card"><div class="card-head"><h2>รายการที่บันทึกแล้ว (' + recs.length + ' ไฟล์)</h2>' +
       (recs.length ? '<span class="small muted">ดับเบิลคลิกที่แถวเพื่อดูรายละเอียด / ลบรายการ</span>' : '') + '</div>';
     if (recs.length) {
-      h += '<div class="tbl-wrap"><table class="tbl tbl-sum tbl-rec"><thead><tr><th class="c-no">#</th><th>รหัสงาน / ชื่องาน</th><th>สายทาง / กม.</th><th>วันที่ปฏิบัติงาน</th><th class="num">ปริมาณ</th><th class="num c-total">รวม (บาท)</th><th>ไฟล์ / นำเข้าโดย</th></tr></thead><tbody>';
+      h += '<div class="tbl-wrap"><table class="tbl tbl-sum tbl-rec"><thead><tr><th class="c-no">#</th><th>รหัสงาน / ชื่องาน</th><th>สายทาง / กม.</th><th>วันที่ปฏิบัติงาน</th><th class="num">ปริมาณ</th><th class="num c-total">รวม (บาท)</th></tr></thead><tbody>';
       recs.forEach(function (r, i) {
         h += '<tr data-rec="' + esc(r.__id) + '" title="ดับเบิลคลิกเพื่อดูรายละเอียด"><td class="c-no muted">' + (i + 1) + '</td>' +
           '<td class="c-name"><span class="code-tag">' + esc(r.code) + '</span> ' + esc(r.name) + '</td>' +
           '<td class="nw">ทล.' + esc(r.route) + ' ตอน ' + esc(r.ctrl) + '<div class="small muted">กม. ' + esc(r.kmFrom) + ' – ' + esc(r.kmTo) + '</div></td>' +
           '<td class="small c-dates">' + compactDates(r.dates) + '</td>' +
-          '<td class="num nw">' + RE.fmtQty(r.qty) + ' <span class="small muted">' + esc(unitOf(r.code)) + '</span></td><td class="num c-total">' + RE.fmt(r.total) + '</td>' +
-          '<td class="small"><div class="fn" title="' + esc(r.file) + '">' + esc(r.file) + '</div><div class="muted">' + esc(r.importedBy || '') + '</div></td></tr>';
+          '<td class="num nw">' + RE.fmtQty(r.qty) + ' <span class="small muted">' + esc(unitOf(r.code)) + '</span></td><td class="num c-total">' + RE.fmt(r.total) + '</td></tr>';
       });
       h += '</tbody></table></div>';
     } else h += '<div class="empty">—</div>';
