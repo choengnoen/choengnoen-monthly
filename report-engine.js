@@ -127,6 +127,13 @@
     return text.replace(/^﻿/, '');
   };
 
+  // แยกชนิดไฟล์ CSV อัตโนมัติ: 'export' = ผลการปฏิบัติงาน (Export_CSV), 'plan' = รายงานแผน-ผล (report01.csv), '' = ไม่รู้จัก
+  RE.detectCsv = function (text) {
+    const rows = parseCsv(text);
+    if (rows.some(function (r) { return r[0] === 'รหัสงาน' && /^\d{5}$/.test(r[1] || ''); })) return 'export';
+    try { RE.parsePlanReport(text); return 'plan'; } catch (e) { return ''; }
+  };
+
   // แปลงไฟล์ Export_CSV 1 ไฟล์ → ข้อมูลผลการปฏิบัติงาน 1 รายการ
   RE.parseExport = function (text, fileName) {
     const rows = parseCsv(text);

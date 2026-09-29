@@ -397,49 +397,76 @@
     const p = $('[data-panel="import"]');
     const recs = monthRecords().sort(function (a, b) { return a.code.localeCompare(b.code) || String(a.dates[0]).localeCompare(String(b.dates[0])); });
     let h = '<div class="card"><div class="card-head"><h2>นำเข้าไฟล์ผลการปฏิบัติงาน · เดือน ' + esc(RE.mkLabel(S.mk)) + '</h2></div>' +
-      '<div class="drop" id="csvDrop"><b>เลือกไฟล์ Export_CSV ทั้งหมดของเดือนมาวางที่นี่</b></div>';
+      '<div class="drop" id="csvDrop"><b>เลือกไฟล์ CSV ทั้งหมดของเดือนมาวางที่นี่ (Export_CSV และ report01.csv รวมกันได้)</b>' +
+      (FBL.isPrivileged() ? '<br><span class="small muted">ระบบแยกให้เองว่าไฟล์ไหนเป็นผลการปฏิบัติงาน ไฟล์ไหนเป็นรายงานแผน-ผล (แผน-ผลจะถือเป็นผลสะสมถึงเดือน ' + esc(RE.mkLabel(S.mk)) + ')</span>' : '') + '</div>';
     if (S.pending) h += pendingHtml();
     h += '</div>';
 
     const aggs = RE.aggregate(recs);
-    h += '<div class="card"><div class="card-head"><h2>สรุปตามรหัสงาน</h2><span class="muted">ยอดรวม = ค่าวัสดุ + ค่าแรงงาน + ค่าเช่าเครื่องจักร + ค่าน้ำมัน</span></div>';
+    h += '<div class="card"><div class="card-head"><h2>สรุปตามรหัสงาน</h2></div>';
     if (!aggs.length) h += '<div class="empty">ยังไม่มีข้อมูลของเดือนนี้ — นำเข้าไฟล์ CSV ด้านบน</div>';
     else {
-      h += '<div class="tbl-wrap"><table class="tbl"><tr><th>รหัสงาน</th><th>ชื่องาน</th><th class="num">ไฟล์</th><th class="num">ปริมาณ</th><th>หน่วย</th><th class="num">วัน</th><th class="num">ค่าวัสดุ</th><th class="num">ค่าแรงงาน</th><th class="num">ค่าเช่า</th><th class="num">ค่าน้ำมัน</th><th class="num">รวม</th><th class="num">Unit Cost</th><th class="num">ผลงาน/วัน</th></tr>';
+      h += '<div class="tbl-wrap"><table class="tbl tbl-sum"><thead><tr><th class="c-code">รหัสงาน</th><th>ชื่องาน</th><th class="num">ไฟล์</th><th class="num">ปริมาณ</th><th class="c-unit">หน่วย</th><th class="num">วัน</th><th class="num g-start">ค่าวัสดุ</th><th class="num">ค่าแรงงาน</th><th class="num">ค่าเช่า</th><th class="num">ค่าน้ำมัน</th><th class="num g-start c-total">รวม (บาท)</th><th class="num g-start">Unit Cost</th><th class="num">ผลงาน/วัน</th></tr></thead><tbody>';
       const T = { mat: 0, lab: 0, rent: 0, fuel: 0, total: 0 };
+      const money = function (v, cls) { return '<td class="num' + (cls ? ' ' + cls : '') + (v ? '' : ' zero') + '">' + RE.fmt(v) + '</td>'; };
       aggs.forEach(function (a) {
         ['mat', 'lab', 'rent', 'fuel', 'total'].forEach(function (k) { T[k] += a[k]; });
         const hid = RE.HIDDEN_WORK_CODES.indexOf(a.code) >= 0;
-        h += '<tr><td><b>' + a.code + '</b></td><td>' + esc(a.name) + (hid ? ' <span class="pill info">ไม่ทำสไลด์</span>' : '') + '</td><td class="num">' + a.count + '</td><td class="num">' + RE.fmtQty(a.qty) + '</td><td>' + esc(unitOf(a.code)) + '</td><td class="num">' + a.days + '</td>' +
-          '<td class="num">' + RE.fmt(a.mat) + '</td><td class="num">' + RE.fmt(a.lab) + '</td><td class="num">' + RE.fmt(a.rent) + '</td><td class="num">' + RE.fmt(a.fuel) + '</td><td class="num"><b>' + RE.fmt(a.total) + '</b></td><td class="num">' + RE.fmt(a.unitCost) + '</td><td class="num">' + RE.fmt(a.perDay, a.perDay >= 100 ? 0 : 2) + '</td></tr>';
+        h += '<tr><td class="c-code"><b>' + a.code + '</b></td><td class="c-name">' + esc(a.name) + (hid ? ' <span class="pill info">ไม่ทำสไลด์</span>' : '') + '</td><td class="num">' + a.count + '</td><td class="num">' + RE.fmtQty(a.qty) + '</td><td class="c-unit">' + esc(unitOf(a.code)) + '</td><td class="num">' + a.days + '</td>' +
+          money(a.mat, 'g-start') + money(a.lab) + money(a.rent) + money(a.fuel) + '<td class="num g-start c-total">' + RE.fmt(a.total) + '</td><td class="num g-start">' + RE.fmt(a.unitCost) + '</td><td class="num">' + RE.fmt(a.perDay, a.perDay >= 100 ? 0 : 2) + '</td></tr>';
       });
-      h += '<tr class="tot"><td colspan="6">รวมทั้งเดือน (' + aggs.length + ' รหัสงาน)</td><td class="num">' + RE.fmt(T.mat) + '</td><td class="num">' + RE.fmt(T.lab) + '</td><td class="num">' + RE.fmt(T.rent) + '</td><td class="num">' + RE.fmt(T.fuel) + '</td><td class="num">' + RE.fmt(T.total) + '</td><td colspan="2"></td></tr></table></div>';
+      h += '</tbody><tfoot><tr class="tot"><td colspan="6">รวมทั้งเดือน (' + aggs.length + ' รหัสงาน)</td><td class="num g-start">' + RE.fmt(T.mat) + '</td><td class="num">' + RE.fmt(T.lab) + '</td><td class="num">' + RE.fmt(T.rent) + '</td><td class="num">' + RE.fmt(T.fuel) + '</td><td class="num g-start c-total">' + RE.fmt(T.total) + '</td><td colspan="2" class="g-start"></td></tr></tfoot></table></div>';
     }
     h += '</div>';
 
-    h += '<div class="card"><div class="card-head"><h2>รายการที่บันทึกแล้ว (' + recs.length + ' ไฟล์)</h2></div>';
+    h += '<div class="card"><div class="card-head"><h2>รายการที่บันทึกแล้ว (' + recs.length + ' ไฟล์)</h2>' +
+      (recs.length ? '<span class="small muted">ดับเบิลคลิกที่แถวเพื่อดูรายละเอียด / ลบรายการ</span>' : '') + '</div>';
     if (recs.length) {
-      h += '<div class="tbl-wrap"><table class="tbl"><tr><th>ไฟล์</th><th>รหัสงาน</th><th>สายทาง / กม.</th><th>วันที่ปฏิบัติงาน</th><th class="num">ปริมาณ</th><th class="num">รวม (บาท)</th><th>นำเข้าโดย</th><th></th></tr>';
-      recs.forEach(function (r) {
-        h += '<tr><td class="small">' + esc(r.file) + '</td><td><b>' + r.code + '</b> ' + esc(r.name.length > 30 ? r.name.slice(0, 30) + '…' : r.name) + '</td><td>ทล.' + esc(r.route) + ' ตอน ' + esc(r.ctrl) + '<br><span class="small muted">กม. ' + esc(r.kmFrom) + ' – ' + esc(r.kmTo) + '</span></td>' +
-          '<td class="small">' + r.dates.map(RE.thDate).join(', ') + ' <span class="muted">(' + r.days + ' วัน)</span></td><td class="num">' + RE.fmtQty(r.qty) + '</td><td class="num">' + RE.fmt(r.total) + '</td>' +
-          '<td class="small muted">' + esc(r.importedBy || '') + '</td><td><button class="btn btn-icon btn-danger" data-delrec="' + esc(r.__id) + '">ลบ</button></td></tr>';
+      h += '<div class="tbl-wrap"><table class="tbl tbl-sum tbl-rec"><thead><tr><th class="c-no">#</th><th>รหัสงาน / ชื่องาน</th><th>สายทาง / กม.</th><th>วันที่ปฏิบัติงาน</th><th class="num">ปริมาณ</th><th class="num c-total">รวม (บาท)</th><th>ไฟล์ / นำเข้าโดย</th></tr></thead><tbody>';
+      recs.forEach(function (r, i) {
+        h += '<tr data-rec="' + esc(r.__id) + '" title="ดับเบิลคลิกเพื่อดูรายละเอียด"><td class="c-no muted">' + (i + 1) + '</td>' +
+          '<td class="c-name"><span class="code-tag">' + esc(r.code) + '</span> ' + esc(r.name) + '</td>' +
+          '<td class="nw">ทล.' + esc(r.route) + ' ตอน ' + esc(r.ctrl) + '<div class="small muted">กม. ' + esc(r.kmFrom) + ' – ' + esc(r.kmTo) + '</div></td>' +
+          '<td class="small c-dates">' + compactDates(r.dates) + '</td>' +
+          '<td class="num nw">' + RE.fmtQty(r.qty) + ' <span class="small muted">' + esc(unitOf(r.code)) + '</span></td><td class="num c-total">' + RE.fmt(r.total) + '</td>' +
+          '<td class="small"><div class="fn" title="' + esc(r.file) + '">' + esc(r.file) + '</div><div class="muted">' + esc(r.importedBy || '') + '</div></td></tr>';
       });
-      h += '</table></div>';
-    } else h += '<div class="muted">—</div>';
+      h += '</tbody></table></div>';
+    } else h += '<div class="empty">—</div>';
     h += '</div>';
     p.innerHTML = h;
 
     bindDrop($('#csvDrop'), '.csv,text/csv', true, importFiles);
-    $$('[data-delrec]', p).forEach(function (b) {
-      b.onclick = async function () {
-        const id = b.getAttribute('data-delrec');
-        const r = S.records.find(function (x) { return x.__id === id; });
-        if (await confirmBox('ลบรายการนี้?', '<p>' + esc(r.file) + ' — รหัส ' + r.code + ' ทล.' + esc(r.route) + '</p><p class="small muted">นำเข้าไฟล์เดิมใหม่ได้ภายหลัง</p>', 'ลบ', true))
-          run(function () { return FBL.del('records', id); }, 'ลบแล้ว');
+    $$('tr[data-rec]', p).forEach(function (tr) {
+      tr.ondblclick = function () {
+        window.getSelection && window.getSelection().removeAllRanges();
+        showRecord(tr.getAttribute('data-rec'));
       };
     });
     if (S.pending) bindPending(p);
+  }
+
+  // หน้าต่างรายละเอียดของรายการที่บันทึกแล้ว (เปิดด้วยการดับเบิลคลิกแถว) — ลบรายการได้จากที่นี่
+  async function showRecord(id) {
+    const r = S.records.find(function (x) { return x.__id === id; });
+    if (!r) return;
+    const kv = function (k, v) { return '<div class="rec-k">' + k + '</div><div class="rec-v">' + v + '</div>'; };
+    const cost = function (k, v) { return '<div class="rec-cost"><span>' + k + '</span><b>' + RE.fmt(v || 0) + '</b></div>'; };
+    const html = '<div class="rec-head"><span class="code-tag">' + esc(r.code) + '</span> <b>' + esc(r.name) + '</b></div>' +
+      '<div class="rec-grid">' +
+      kv('สายทาง', 'ทล.' + esc(r.route) + ' ตอนควบคุม ' + esc(r.ctrl)) +
+      kv('ช่วง กม.', esc(r.kmFrom) + ' – ' + esc(r.kmTo)) +
+      kv('วันที่ปฏิบัติงาน', r.dates.map(RE.thDate).map(esc).join(', ') + ' <span class="muted">(' + r.days + ' วัน)</span>') +
+      kv('ปริมาณงาน', RE.fmtQty(r.qty) + ' ' + esc(unitOf(r.code))) +
+      kv('ไฟล์', esc(r.file)) +
+      kv('นำเข้าโดย', esc(r.importedBy || '—')) + '</div>' +
+      '<div class="rec-costs">' + cost('ค่าวัสดุ', r.mat) + cost('ค่าแรงงาน', r.lab) + cost('ค่าเช่า', r.rent) + cost('ค่าน้ำมัน', r.fuel) +
+      '<div class="rec-cost rec-total"><span>รวม (บาท)</span><b>' + RE.fmt(r.total) + '</b></div></div>' +
+      '<p class="small muted" style="margin-top:12px">ถ้าลบแล้ว สามารถนำเข้าไฟล์เดิมใหม่ได้ภายหลัง</p>';
+    if (await modal({ title: 'รายละเอียดรายการ', html: html, ok: 'ลบรายการนี้', danger: true, cancel: 'ปิด', wide: true })) {
+      if (await confirmBox('ยืนยันการลบ?', '<p>' + esc(r.file) + ' — รหัส ' + esc(r.code) + ' ทล.' + esc(r.route) + '</p>', 'ลบ', true))
+        run(function () { return FBL.del('records', id); }, 'ลบแล้ว');
+    }
   }
 
   function pendingHtml() {
@@ -516,9 +543,12 @@
   async function importFiles(files) {
     files = files.filter(function (f) { return /\.csv$/i.test(f.name); });
     if (!files.length) { toast('ไม่พบไฟล์ .csv', 'err'); return; }
-    const rows = [];
+    const rows = [], plans = [];
     for (const f of files) {
-      try { rows.push({ file: f.name, rec: RE.parseExport(await RE.decodeFile(f), f.name), issues: [] }); }
+      let text = '';
+      try { text = await RE.decodeFile(f); } catch (e) { rows.push({ file: f.name, rec: null, issues: [{ level: 'error', msg: e.message }] }); continue; }
+      if (RE.detectCsv(text) === 'plan') { plans.push({ file: f, text: text }); continue; }
+      try { rows.push({ file: f.name, rec: RE.parseExport(text, f.name), issues: [] }); }
       catch (e) { rows.push({ file: f.name, rec: null, issues: [{ level: 'error', msg: e.message }] }); }
     }
     const batch = rows.filter(function (r) { return r.rec; }).map(function (r) { return r.rec; });
@@ -527,8 +557,16 @@
       r.level = r.issues.some(function (s) { return s.level === 'error'; }) ? 'error' : r.issues.some(function (s) { return s.level === 'warn'; }) ? 'warn' : r.issues.length ? 'info' : 'ok';
     });
     rows.sort(function (a, b) { const o = { error: 0, warn: 1, info: 2, ok: 3 }; return o[a.level] - o[b.level]; });
-    S.pending = rows;
+    if (rows.length) S.pending = rows;
     renderImport();
+    // ไฟล์รายงานแผน-ผล (report01.csv): แยกให้อัตโนมัติ แล้วเปิดหน้าต่างยืนยันต่อจากรายการผลงาน
+    if (plans.length) {
+      if (!FBL.isPrivileged()) toast('พบไฟล์รายงานแผน-ผล (' + plans[0].file.name + ') — นำเข้าได้เฉพาะเจ้าของระบบ/ผู้ดูแลระบบ', 'err', 7000);
+      else {
+        if (plans.length > 1) toast('พบรายงานแผน-ผล ' + plans.length + ' ไฟล์ — ใช้ไฟล์แรก (' + plans[0].file.name + ')', 'err', 6000);
+        await importPlanReport(plans[0].file, plans[0].text);
+      }
+    }
   }
 
   /* ======================================================================
@@ -681,21 +719,20 @@
     const mergeable = RE.GROUPS.map(function (g) {
       return { g: g, subs: aggs.filter(function (a) { return a.group === g.code && RE.HIDDEN_WORK_CODES.indexOf(a.code) < 0; }) };
     }).filter(function (x) { return x.subs.length >= 2; });
-    let h = '<div class="card"><div class="row"><h2 style="flex:1">รายรหัสงาน · ' + shown.length + ' สไลด์</h2>' +
-      '<span class="muted small">ลากรูปมาวางในแต่ละรหัสงาน ระบบจัดวาง ครอป และเรียงตามเวลาถ่ายให้อัตโนมัติ · คลิกรูปเพื่อเลือกจุดกึ่งกลาง</span></div>' +
+    let h = '<div class="card"><div class="row"><h2 style="flex:1">รายรหัสงาน · ' + shown.length + ' สไลด์</h2></div>' +
       (mergeable.length ? '<div style="margin:10px 0 0"><b class="small">รวมรหัสย่อยเป็นสไลด์เดียว (ตามกลุ่มงาน)</b>' +
         mergeable.map(function (x) {
           return '<div class="small" style="margin-top:4px"><label><input type="checkbox" data-merge="' + x.g.code + '"' + (mg[x.g.code] ? ' checked' : '') + '> ' +
             '<b>' + x.g.code + '</b> ' + esc(RE.groupName(x.g.code)) + ' — รวม ' + x.subs.map(function (a) { return a.code; }).join(', ') + ' (' + x.subs.length + ' สไลด์ → 1 สไลด์)</label></div>';
         }).join('') +
-        '<p class="small muted" style="margin:4px 0 0">สไลด์รวมแสดงรายสายทางของทุกรหัสย่อย (ขึ้นต้นบรรทัดด้วยรหัสงาน) และรวมค่าใช้จ่าย · ถ้าหน่วยนับต่างกัน จะแสดงปริมาณแยกตามหน่วย และไม่คิด Unit Cost · รูปของสไลด์รวมแยกจากรูปรายรหัส</p></div>' : '') +
-      (hidden.length ? '<p class="small muted" style="margin:8px 0 0">ไม่ทำสไลด์: ' + hidden.map(function (a) { return a.code + ' ' + esc(a.name.slice(0, 40)); }).join(', ') + ' (งานบริหาร — ยังนับในยอดรวม กราฟ และแผน-ผล)</p>' : '') + '</div>';
+        '</div>' : '') + '</div>';
     shown.forEach(function (a) {
       const slot = 'work:' + a.code;
       const spec = workSpec(a);
       const n = photosOf(slot).length;
       const unitHtml = a.merged
-        ? a.subs.map(function (c) { return '<div class="row" style="margin-bottom:4px"><div style="width:70px" class="small"><b>' + c + '</b></div><div style="width:130px">' + unitFieldHtml(c) + '</div></div>' + unitNoteHtml(c); }).join('') +
+        ? '<div class="unit-grid">' + a.subs.map(function (c) { return '<div class="unit-item"><b class="small">' + c + '</b>' + unitFieldHtml(c) + '</div>'; }).join('') + '</div>' +
+          a.subs.map(unitNoteHtml).join('') +
           '<div class="muted small">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + ' รายการสายทาง</div>'
         : '<div class="row"><div style="width:130px"><label class="f">หน่วยนับ</label>' + unitFieldHtml(a.code) + '</div>' +
           '<div class="muted small" style="flex:1">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + ' สายทาง</div></div>' + unitNoteHtml(a.code);
@@ -704,14 +741,14 @@
       // รูปที่อยู่ในสไลด์รายรหัสย่อยเดิม — ดึงมาใช้ในสไลด์รวมได้
       const subPh = a.merged ? a.subs.reduce(function (s, c) { return s.concat(photosOf('work:' + c)); }, []) : [];
       h += '<div class="card" id="w-' + a.code + '"><div class="card-head"><h3>รหัส ' + a.code + ' ' + esc(a.name) + (a.merged ? ' <span class="pill info">รวม ' + a.subs.join(', ') + '</span>' : '') + '</h3><div class="sp"></div>' +
-        (ex[a.code] ? '<span class="pill info">ไม่ใส่ในไฟล์</span>' : n ? '<span class="pill ok">' + n + ' รูป</span>' : '<span class="pill warn">ยังไม่มีรูป</span>') +
+        (ex[a.code] ? '<span class="pill info">ไม่ใส่ในไฟล์</span>' : '') +
         '<label class="small"><input type="checkbox" data-excl="' + a.code + '"' + (ex[a.code] ? ' checked' : '') + '> ไม่ใส่สไลด์นี้</label></div>' +
         '<div class="work"><div data-prev="' + a.code + '">' + slideHtml(spec) + '</div><div>' +
         unitHtml +
         '<div class="kv" style="margin:12px 0"><div>ปริมาณรวม</div><div>' + qtyTxt + '</div><div>ค่าใช้จ่ายรวม</div><div><b>' + RE.fmt(a.total) + '</b> บาท</div>' +
         '<div>Unit Cost</div><div>' + ucTxt + '</div></div>' +
         (subPh.length && n < RE.MAX_PHOTOS ? '<button class="btn btn-sm" style="margin-bottom:8px" data-pullsub="' + a.code + '">ดึงรูปจากสไลด์รายรหัสย่อย (' + subPh.length + ' รูป)</button>' : '') +
-        '<div class="drop small" data-pdrop="' + slot + '"><b>+ เพิ่มรูป</b> ลากมาวาง หรือคลิกเลือก (แนะนำ 4 รูป สูงสุด 6)</div>' +
+        '<div class="drop small" data-pdrop="' + slot + '"><b>+ เพิ่มรูป</b> ลากมาวาง หรือคลิกเลือก<br><span class="muted">ตอนนี้ ' + n + '/' + RE.MAX_PHOTOS + ' รูป · แนะนำ 4 รูป</span></div>' +
         thumbsHtml(slot) + layoutSelectHtml(slot, n, spec.layout) + '</div></div></div>';
     });
     h += '<datalist id="unitList"><option>ตร.ม.</option><option>ม.</option><option>ต้น</option><option>จุด</option><option>แห่ง</option><option>ลบ.ม.</option><option>ตัน</option><option>ชุด</option><option>ป้าย</option><option>งาน</option></datalist>';
@@ -1008,7 +1045,7 @@
     const cum = RE.cumulative(plan, S.records, S.mk);
     let h = '<div class="card"><div class="card-head"><h2>แผนงบประมาณบำรุงปกติ ปีงบประมาณ ' + fy + '</h2><div class="sp"></div>' +
       (can ? '<button class="btn btn-primary" id="savePlan">บันทึกแผน</button>' : '<span class="pill info">แก้ไขได้เฉพาะเจ้าของระบบ/ผู้ดูแลระบบ</span>') + '</div>' +
-      (can ? '<div class="drop" id="planDrop" style="margin-bottom:14px"><b>นำเข้าไฟล์รายงานแผน-ผลจากระบบของแขวง (เช่น report01.csv)</b><br><span class="small muted">ระบบจะกรอกแผน และผลสะสมถึงเดือน ' + esc(RE.mkLabel(S.mk)) + ' ตามกลุ่มงานให้อัตโนมัติ</span></div>' : '') +
+      (can ? '<p class="small muted" style="margin-bottom:14px">นำเข้าไฟล์รายงานแผน-ผลจากระบบของแขวง (เช่น report01.csv) ได้ที่แท็บ ① นำเข้าข้อมูล — วางรวมกับ Export_CSV ได้เลย ระบบแยกชนิดไฟล์ให้เอง</p>' : '') +
       '<div><h3 style="margin-bottom:8px">แผนและผลตามกลุ่มงาน</h3><div class="tbl-wrap"><table class="tbl"><tr><th>กลุ่มงาน</th><th class="num">แผน (บาท)</th><th class="num">ผลสะสมยกมา</th><th class="num">ผลสะสม ณ ' + esc(RE.mkShort(S.mk)) + '</th></tr>';
     RE.GROUPS.forEach(function (g) {
       h += '<tr><td><span class="pill" style="background:#' + g.color + ';color:#fff">' + g.code + '</span> ' + esc(g.name) + '</td>' +
@@ -1047,15 +1084,12 @@
       const d = readPlanForm(fy);
       run(function () { return FBL.set('plans', String(fy), Object.assign(d, { fy: fy, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name })); }, 'บันทึกแผนแล้ว').then(renderPlan);
     };
-    if ($('#planDrop')) bindDrop($('#planDrop'), '.csv,text/csv', false, importPlanReport);
   }
   // นำเข้ารายงานแผน-ผลของแขวง: แผน → แผนรายกลุ่ม, ผล → "ผลสะสมยกมา" ถึงเดือนที่เลือกอยู่
   // (เดือนถัดไประบบคำนวณต่อจาก Export_CSV ที่นำเข้าในแท็บ ①)
-  async function importPlanReport(files) {
-    const f = files.filter(function (x) { return /\.csv$/i.test(x.name); })[0];
-    if (!f) { toast('ไม่พบไฟล์ .csv', 'err'); return; }
+  async function importPlanReport(f, text) {
     let r;
-    try { r = RE.parsePlanReport(await RE.decodeFile(f)); } catch (e) { toast(e.message || String(e), 'err'); return; }
+    try { r = RE.parsePlanReport(text); } catch (e) { toast(e.message || String(e), 'err'); return; }
     const fy = RE.fyOf(S.mk), upto = RE.fyIndex(S.mk);
     const warn = [];
     ['plan', 'result'].forEach(function (k) {
@@ -1080,7 +1114,7 @@
     d.carryGroups = r.result;
     delete d.pct; delete d.carryCum;   // ช่องแผน-ผลสะสมรายเดือนเลิกใช้แล้ว
     d.planSource = { file: f.name, mk: S.mk, importedAt: FBL.nowIso(), importedBy: FBL.user.name };
-    run(function () { return FBL.set('plans', String(fy), Object.assign(d, { fy: fy, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name })); }, 'อัปเดตแผน-ผลจากไฟล์แล้ว').then(renderPlan);
+    run(function () { return FBL.set('plans', String(fy), Object.assign(d, { fy: fy, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name })); }, 'อัปเดตแผน-ผลจากไฟล์แล้ว').then(renderAll);
   }
   function budgetImg() { const b = photosOf('budget')[0]; return b ? photoSpec(b) : null; }
   // % แผน/ผลสะสมจากรูปกราฟ (เก็บในรายงานของเดือน เป็นข้อความตามที่พิมพ์) — ช่องที่กำลังแก้อยู่มาก่อนค่าที่บันทึกไว้

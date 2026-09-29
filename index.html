@@ -124,6 +124,9 @@ nav.tabs button:hover{color:#DEDFE2}
 nav.tabs button.on{color:#fff;border-bottom-color:var(--gold)}
 nav.tabs .badge{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:rgba(255,255,255,.12);color:#DEDFE2;font-size:11px;margin-left:4px}
 @media (max-width:900px){header.top .tabs-row{flex-direction:column-reverse;align-items:stretch}header.top .header-actions{justify-content:flex-end;padding:8px 0 2px}}
+nav.tabs .num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-right:8px;border-radius:50%;background:rgba(255,255,255,.14);color:#DEDFE2;font-size:12.5px;font-weight:700;line-height:1;vertical-align:middle;transition:background .15s,color .15s}
+nav.tabs button:hover .num{background:rgba(255,255,255,.24)}
+nav.tabs button.on .num{background:var(--gold);color:#1a1a1a;box-shadow:0 0 0 3px rgba(255,255,255,.08)}
 nav.tabs .badge.warn{background:var(--amber-bg);color:var(--amber)}
 /* ความกว้างเท่าระบบงานอุบัติเหตุ (.shell 1180px ขอบซ้ายขวา 18px) */
 main{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
@@ -132,6 +135,10 @@ main{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
 .card-head .sp{flex:1}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.unit-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;margin-bottom:4px}
+.unit-item{display:flex;align-items:center;gap:6px;min-width:0}
+.unit-item b{flex:none}
+.unit-item input,.unit-item select{padding:3px 8px;font-size:13px;min-width:0}
 .empty{padding:40px 20px;text-align:center;color:var(--ink-soft)}
 .empty h2{margin-bottom:8px}
 
@@ -142,6 +149,48 @@ table.tbl th{background:var(--navy-100);color:var(--navy-900);text-align:left;pa
 table.tbl td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 table.tbl tr.tot td{font-weight:700;background:#f7f9fb}
 table.tbl tr.bad td{background:#fff7f5}
+/* ตาราง "สรุปตามรหัสงาน" — จัดกลุ่มคอลัมน์ให้อ่านง่าย */
+.tbl-wrap:has(.tbl-sum){max-height:70vh;border:1px solid var(--line);border-radius:10px}
+table.tbl-sum{border-collapse:separate;border-spacing:0;font-size:14px}
+table.tbl-sum thead th{position:sticky;top:0;z-index:2;background:var(--navy-100);color:var(--navy-900);padding:11px 12px;border-bottom:2px solid var(--navy-700);font-size:13px;letter-spacing:.2px}
+table.tbl-sum td{padding:11px 12px;border-bottom:1px solid #edf0f4;vertical-align:middle;line-height:1.45}
+table.tbl-sum tbody tr:nth-child(even) td{background:#fafbfd}
+table.tbl-sum tbody tr:hover td{background:#eef4fb}
+table.tbl-sum tbody tr:last-child td{border-bottom:0}
+table.tbl-sum .g-start{border-left:1px solid var(--line)}
+table.tbl-sum .c-code{white-space:nowrap;color:var(--navy-800);padding-left:14px}
+table.tbl-sum .c-code b{font-family:'Kanit','Sarabun',sans-serif;font-weight:600;letter-spacing:.3px}
+table.tbl-sum .c-name{min-width:220px;max-width:340px;font-weight:500}
+table.tbl-sum .c-unit{color:var(--ink-soft);white-space:nowrap}
+table.tbl-sum td.num{white-space:nowrap}
+table.tbl-sum td.zero{color:#b7bfc9}
+table.tbl-sum td.c-total{font-weight:700;color:var(--navy-900)}
+table.tbl-sum tbody td.c-total{background:var(--gold-bg)}
+table.tbl-sum tbody tr:hover td.c-total{background:#ffefc2}
+table.tbl-sum tfoot td{position:sticky;bottom:0;z-index:2;background:var(--navy-800);color:#fff;font-weight:700;padding:12px;border-top:2px solid var(--gold)}
+table.tbl-sum tfoot td.c-total{background:var(--navy-900);color:var(--gold);font-size:15px}
+table.tbl-sum tfoot td.g-start{border-left-color:rgba(255,255,255,.18)}
+/* ตาราง "รายการที่บันทึกแล้ว" — ดับเบิลคลิกแถวเพื่อเปิดหน้าต่างรายละเอียด */
+table.tbl-rec tbody tr{cursor:pointer;user-select:none}
+table.tbl-rec td{vertical-align:top}
+table.tbl-rec .c-no{width:40px;text-align:center;padding-left:8px;padding-right:4px;font-size:13px}
+table.tbl-rec th.c-no{text-align:center}
+table.tbl-rec .c-name{min-width:200px;max-width:300px}
+table.tbl-rec .c-dates{min-width:170px;max-width:340px;line-height:1.6}
+table.tbl-rec .nw{white-space:nowrap}
+table.tbl-rec .fn{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-soft)}
+table.tbl-rec .c-total{white-space:nowrap}
+.code-tag{display:inline-block;background:var(--navy-100);color:var(--navy-800);font-family:'Kanit','Sarabun',sans-serif;font-weight:600;font-size:13px;letter-spacing:.3px;padding:0 8px;border-radius:6px;margin-right:2px}
+.card-head .small.muted{margin-left:auto}
+.rec-head{font-size:16px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.rec-grid{display:grid;grid-template-columns:120px 1fr;gap:8px 14px;font-size:14px}
+.rec-k{color:var(--ink-mute)} .rec-v{color:var(--ink);word-break:break-word}
+.rec-costs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:16px}
+.rec-cost{background:#f7f9fb;border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:right}
+.rec-cost span{display:block;font-size:12px;color:var(--ink-mute);text-align:left}
+.rec-cost b{font-size:15px;color:var(--navy-900)}
+.rec-cost.rec-total{background:var(--gold-bg);border-color:var(--gold)}
+@media(max-width:600px){.rec-grid{grid-template-columns:1fr;gap:2px 0}.rec-k{margin-top:6px}.rec-costs{grid-template-columns:repeat(2,1fr)}}
 .pill{display:inline-block;padding:1px 9px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
 .pill.ok{background:var(--green-bg);color:var(--green)}
 .pill.warn{background:var(--amber-bg);color:var(--amber)}
@@ -275,11 +324,11 @@ table.pend tr.skip td:last-child{opacity:1}
     </div>
     <div class="tabs-row">
   <nav class="tabs" id="tabs">
-    <button data-tab="import" class="on">① นำเข้าข้อมูล <span class="badge" id="bImport">0</span></button>
-    <button data-tab="work">② รายรหัสงาน &amp; รูป <span class="badge" id="bWork">0</span></button>
-    <button data-tab="cover">③ ปก &amp; ปัญหาอุปสรรค</button>
-    <button data-tab="plan">④ แผน-ผล</button>
-    <button data-tab="export">⑤ ส่งออก PowerPoint</button>
+    <button data-tab="import" class="on"><span class="num">1</span>นำเข้าข้อมูล <span class="badge" id="bImport">0</span></button>
+    <button data-tab="work"><span class="num">2</span>รายรหัสงาน &amp; รูป <span class="badge" id="bWork">0</span></button>
+    <button data-tab="cover"><span class="num">3</span>ปก &amp; ปัญหาอุปสรรค</button>
+    <button data-tab="plan"><span class="num">4</span>แผน-ผล</button>
+    <button data-tab="export"><span class="num">5</span>ส่งออก PowerPoint</button>
     <button data-tab="settings">ตั้งค่า</button>
   </nav>
       <div class="header-actions">
