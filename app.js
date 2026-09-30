@@ -460,7 +460,7 @@
       const pill = x.level === 'error' ? '<span class="pill err">ผิดพลาด</span>' : x.level === 'warn' ? '<span class="pill warn">ตรวจสอบ</span>' : '<span class="pill ok">ผ่าน</span>';
       h += '<tr class="' + (x.level === 'error' ? 'bad' : x.confirmed === false ? 'skip' : '') + '"><td>' + pill + '</td><td class="small">' + esc(x.file) +
         (x.issues.length ? '<ul class="issues">' + x.issues.map(function (s) { return '<li class="' + s.level + '">' + esc(s.msg) + '</li>'; }).join('') + '</ul>' : '') + '</td>' +
-        (r ? '<td><b>' + r.code + '</b><div class="nm" title="' + esc(r.name) + '">' + esc(r.name) + '</div></td><td>ทล.' + esc(r.route) + '<br><span class="small muted"><span class="km">กม. ' + esc(r.kmFrom) + '</span> <span class="km">– ' + esc(r.kmTo) + '</span></span></td><td class="small dt">' + compactDates(r.dates) + '</td><td class="num">' + RE.fmtQty(r.qty) + '</td><td class="num">' + RE.fmt(r.total) + '</td>'
+        (r ? '<td><b>' + r.code + '</b><div class="nm" title="' + esc(r.name) + '">' + esc(RE.SHORT_NAMES[r.code] || r.name) + '</div></td><td>ทล.' + esc(r.route) + '<br><span class="small muted"><span class="km">กม. ' + esc(r.kmFrom) + '</span> <span class="km">– ' + esc(r.kmTo) + '</span></span></td><td class="small dt">' + compactDates(r.dates) + '</td><td class="num">' + RE.fmtQty(r.qty) + '</td><td class="num">' + RE.fmt(r.total) + '</td>'
           : '<td colspan="5"></td>') +
         '<td class="c">' + (x.level === 'warn'
           ? '<div class="dec"><button type="button" class="yes' + (x.confirmed === true ? ' on' : '') + '" data-dec="' + i + '" data-v="1" title="ใช้ข้อมูล (ตรวจแล้ว ถูกต้อง)">✓</button>' +
@@ -491,7 +491,7 @@
       }
       parts.push(rs.join(', ') + ' ' + RE.MONTHS_SHORT[Number(ym.slice(5, 7)) - 1]);
     }
-    return '<span class="dchip">' + ds.length + ' วัน</span> ' + esc(parts.join(' · '));
+    return '<span class="dchip">' + ds.length + ' วัน</span><br>' + esc(parts.join(' · '));
   }
   function bindPending(p) {
     $$('[data-dec]', p).forEach(function (b) {
