@@ -170,7 +170,7 @@
         h += e.pw ? '<div style="' + pos(e) + photoBg(e.src, e.pw, e.ph, Object.assign({ fx: .5, fy: .5 }, e)) + softCss(e) + '"></div>'
           : '<img src="' + e.src + '" style="' + pos(e) + '" alt="">';
       } else if (e.type === 'photo') {
-        h += '<div class="el-photo" data-photo="' + esc(e.id) + '" title="คลิกเพื่อเลือกจุดกึ่งกลางของรูป" style="cursor:pointer;' + pos(e) + photoBg(thumbs[e.id] || '', e.pw, e.ph, e) + softCss(e) + '"></div>';
+        h += '<div class="el-photo" data-photo="' + esc(e.id) + '" style="' + pos(e) + photoBg(thumbs[e.id] || '', e.pw, e.ph, e) + softCss(e) + '"></div>';
       } else if (e.type === 'softbox') {
         const b = e.blur / W * 100;
         h += '<div style="left:' + ((e.x + e.blur) / W * 100) + '%;top:' + ((e.y + e.blur) / H * 100) + '%;width:' + ((e.w - 2 * e.blur) / W * 100) + '%;height:' + ((e.h - 2 * e.blur) / H * 100) + '%;' +
@@ -191,11 +191,6 @@
       }
     });
     return '<div class="slide" style="' + bg + '">' + h + '</div>';
-  }
-  function bindSlideClicks(root) {
-    $$('.el-photo[data-photo]', root).forEach(function (el) {
-      el.onclick = function () { focusModal(el.getAttribute('data-photo')); };
-    });
   }
 
   /* ---------------- ปุ่มรูปตา แสดง/ซ่อนรหัสผ่าน (ใส่ให้ทุกช่องรหัสผ่านอัตโนมัติ รวมช่องที่สร้างทีหลัง) ---------------- */
@@ -631,23 +626,6 @@
       };
     });
   }
-  function focusModal(id) {
-    const p = S.photos.find(function (x) { return x.__id === id; });
-    if (!p) return;
-    modal({ title: 'เลือกจุดกึ่งกลางของรูป', ok: false, cancel: 'ปิด', wide: true,
-      html: '<p class="small muted">คลิกตรงจุดที่ต้องการให้อยู่กลางกรอบ (เช่น คนงาน เครื่องจักร หรือจุดที่ซ่อม) — ระบบตั้งให้อัตโนมัติไว้แล้วที่วงกลมสีเหลือง</p>' +
-        '<div id="fcBox" style="position:relative;cursor:crosshair;display:inline-block;max-width:100%"><img src="' + p.thumb + '" style="max-width:100%;max-height:60vh;display:block;border-radius:6px">' +
-        '<span id="fcDot" style="position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px #FAC02E;left:' + (p.fx * 100) + '%;top:' + (p.fy * 100) + '%"></span></div>' +
-        '<div class="small muted" style="margin-top:8px">' + esc(p.name || '') + ' · ' + p.w + '×' + p.h + ' px' + ((p.flags || []).length ? ' · <b style="color:var(--amber)">' + esc(p.flags.join(', ')) + '</b>' : '') + '</div>',
-      onOpen: function (bg, close) {
-        $('#fcBox', bg).onclick = function (ev) {
-          const r = $('#fcBox img', bg).getBoundingClientRect();
-          const fx = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)), fy = Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height));
-          $('#fcDot', bg).style.left = fx * 100 + '%'; $('#fcDot', bg).style.top = fy * 100 + '%';
-          run(function () { return FBL.set('photos', id, { fx: fx, fy: fy }, true); }).then(function () { setTimeout(function () { close(true); }, 250); });
-        };
-      } });
-  }
   // หน้าต่างจัดการรูปของสไลด์ (เพิ่ม/ลบ/เรียง/จุดกึ่งกลาง/แบบจัดวาง รวมที่เดียว) — วาดใหม่เองเมื่อข้อมูลรูปหรือรายงานเปลี่ยน
   // ไอคอน photo-edit (Tabler, outline) ฝังเป็น SVG เพื่อไม่ต้องพึ่งไฟล์ฟอนต์ภายนอก
   const PHOTO_EDIT_ICON = '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
@@ -799,7 +777,6 @@
     });
     h += '<datalist id="unitList"><option>ตร.ม.</option><option>ม.</option><option>ต้น</option><option>จุด</option><option>แห่ง</option><option>ลบ.ม.</option><option>ตัน</option><option>ชุด</option><option>ป้าย</option><option>งาน</option></datalist>';
     p.innerHTML = h;
-    bindSlideClicks(p);
     $$('[data-pmgr]', p).forEach(function (b) {
       b.onclick = function () {
         const code = b.getAttribute('data-pmgr');
@@ -1030,13 +1007,12 @@
     const spec = RE.slideCover({ mk: S.mk, meetingText: $('#meetingText').value.trim(), orgText: $('#orgText').value.trim(), cover: photosOf('cover')[0] ? photoSpec(photosOf('cover')[0]) : null, logo: emblem() });
     $('#coverPrev').innerHTML = slideHtml(spec);
   }
-  function renderCoverPreview() { const el = $('#coverPrev'); if (el) { el.innerHTML = slideHtml(coverSpec()); bindSlideClicks(el); } }
+  function renderCoverPreview() { const el = $('#coverPrev'); if (el) { el.innerHTML = slideHtml(coverSpec()); } }
   function renderProblemPreviews() {
     problems().forEach(function (pr) {
       const el = $('[data-probprev="' + pr.id + '"]');
       if (!el) return;
       el.innerHTML = problemSpecs(pr).map(slideHtml).join('');
-      bindSlideClicks(el);
     });
   }
 
