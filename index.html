@@ -358,7 +358,9 @@ table.pend tr.skip td:last-child{opacity:1}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
 .fgrid .w2{grid-column:span 2}
 .pf-head{display:grid;grid-template-columns:110px 1.5fr 1fr 1.5fr;gap:8px}
-.pf-pt{display:grid;grid-template-columns:30px 1fr 1.1fr 1.1fr 1.4fr 72px 72px 72px 30px;gap:8px;align-items:end}
+.pf-pt{display:grid;grid-template-columns:30px 1fr 30px;gap:8px;align-items:start}
+.pf-pt .pt-no,.pf-pt .pt-del{margin-top:22px}
+.pf-text textarea{width:100%;resize:vertical;min-height:84px;font:inherit;line-height:1.5;white-space:pre-wrap}
 .pf-pt2{display:flex;gap:8px;align-items:end;margin-top:6px;flex-wrap:wrap}
 .pf-pt2 .pf-extra{flex:1;min-width:200px}
 .pf-pt2 .btn-pmgr{padding:5px 12px;font-size:13px;white-space:nowrap}
@@ -369,7 +371,7 @@ details.prev{margin-top:8px}
 details.prev>summary{cursor:pointer;font-size:13px;color:var(--ink-soft);user-select:none}
 details.prev[open]>summary{margin-bottom:8px}
 details.prev .grid2{grid-template-columns:repeat(auto-fill,minmax(260px,320px));gap:12px}
-@media (max-width:1000px){.pf-head{grid-template-columns:1fr 1fr}.pf-pt{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}.pf-pt .pt-no{display:none}}
+@media (max-width:1000px){.pf-head{grid-template-columns:1fr 1fr}.pf-pt{grid-template-columns:1fr 30px}.pf-pt .pt-no{display:none}}
 
 /* หน้าต่าง / แจ้งเตือน */
 /* รูปแบบเดียวกับระบบอุบัติเหตุ (พื้นหลังเบลอ มุมโค้ง 20px ปุ่ม × กลม เลื่อนเฉพาะเนื้อหา) แต่ใช้โทนฟ้าของระบบนี้ */

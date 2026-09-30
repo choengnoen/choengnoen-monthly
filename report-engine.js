@@ -1043,7 +1043,7 @@
             points: [{ km, side, object, damage, length, width, depth, extra }] }            */
   RE.PROBLEM_KINDS = ['อุทกภัย', 'ดินสไลด์ / ดินทรุด', 'ต้นไม้ล้มขวางทาง', 'ผิวทางชำรุดเสียหาย', 'อุบัติเหตุทำทรัพย์สินเสียหาย', 'อื่น ๆ'];
   RE.problemTitles = function (pr) {
-    const t1 = pr.title || (pr.kind === 'อุทกภัย' ? 'รายงานปัญหา ความเสียหายของพื้นที่จากเหตุอุทกภัย'
+    const t1 = pr.title || (pr.kind === 'อุทกภัย' ? 'รายงานปัญหา อุปสรรค'
       : pr.kind && pr.kind !== 'อื่น ๆ' ? 'รายงานปัญหา ' + pr.kind : 'รายงานปัญหา อุปสรรค');
     let t2 = '';
     if (pr.route) t2 = 'ทางหลวงหมายเลข ' + pr.route + (pr.section ? ' ตอน ' + pr.section : '');
@@ -1051,6 +1051,8 @@
   };
   function m2(v) { const n = Number(v); return v === '' || v == null || !isFinite(n) ? '' : RE.fmt(n, 2); }
   RE.problemCaption = function (pt) {
+    // ข้อความที่พิมพ์เอง (จัดบรรทัดเอง) ใช้ตามนั้น; ข้อมูลเก่าที่แยกช่องยังประกอบข้อความให้เหมือนเดิม
+    if (typeof pt.text === 'string') return pt.text.replace(/\r/g, '').replace(/^\n+|\s+$/g, '');
     const l1 = [pt.km ? 'กม.' + pt.km : '', pt.side || ''].filter(Boolean).join(' ');
     const l2 = [pt.object || '', pt.damage || ''].filter(Boolean).join(' ');
     const dims = [];

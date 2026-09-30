@@ -880,8 +880,7 @@
       '<button class="btn btn-pmgr" data-pmgr-cover="1" title="เปลี่ยนรูปปก และเลือกจุดกึ่งกลางของรูป">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน</button>' +
       '</div></div></div>';
 
-    h += '<div class="card"><div class="card-head"><h2>ปัญหา อุปสรรค</h2><div class="sp"></div><button class="btn btn-primary" id="addProb">+ เพิ่มเรื่องปัญหา/ความเสียหาย</button></div>' +
-      '<p class="small muted" style="margin-top:0">กรอกเป็นช่อง ระบบเรียงข้อความบนสไลด์ให้ เช่น "กม.14+100 ด้านขวาทาง / ไหล่ทาง ถูกน้ำกัดเซาะ / ความยาว 12.00 ม. / ลึก 3.00 ม." — สไลด์ละ 3 จุด เกินกว่านั้นแยกสไลด์ให้อัตโนมัติ</p>';
+    h += '<div class="card"><div class="card-head"><h2>ปัญหา อุปสรรค</h2><div class="sp"></div><button class="btn btn-primary" id="addProb">+ เพิ่มเรื่อง</button></div>';
     const probs = problems();
     if (!probs.length) h += '<div class="empty small">เดือนนี้ยังไม่มีเรื่องปัญหาอุปสรรค (ถ้าไม่มี จะไม่มีสไลด์หน้านี้ในไฟล์)</div>';
     probs.forEach(function (pr, pi) {
@@ -895,20 +894,15 @@
       (pr.points || []).forEach(function (pt, k) {
         const slot = 'prob:' + pr.id + ':' + pt.id;
         const n = photosOf(slot).length;
+        const capText = typeof pt.text === 'string' ? pt.text : RE.problemCaption(pt);
         h += '<div class="pt" data-ptid="' + pt.id + '"><div class="pf-pt">' +
           '<span class="pt-no" title="จุดที่ ' + (k + 1) + '">' + (k + 1) + '</span>' +
-          '<div><label class="f">กม.</label><input type="text" data-tf="km" placeholder="14+100" value="' + esc(pt.km || '') + '"></div>' +
-          '<div><label class="f">ตำแหน่ง</label><select data-tf="side">' + ['ด้านซ้ายทาง', 'ด้านขวาทาง', 'ทั้งสองด้าน', 'กลางทาง', ''].map(function (s) { return '<option value="' + s + '"' + (s === (pt.side || '') ? ' selected' : '') + '>' + (s || '— ไม่ระบุ —') + '</option>'; }).join('') + '</select></div>' +
-          '<div><label class="f">สิ่งที่เสียหาย</label><input type="text" list="objList" data-tf="object" placeholder="ไหล่ทาง" value="' + esc(pt.object || '') + '"></div>' +
-          '<div><label class="f">ลักษณะความเสียหาย</label><input type="text" list="dmgList" data-tf="damage" placeholder="ถูกน้ำกัดเซาะ" value="' + esc(pt.damage || '') + '"></div>' +
-          '<div><label class="f">ความยาว (ม.)</label><input type="number" step="0.01" min="0" data-tf="length" value="' + esc(pt.length == null ? '' : pt.length) + '"></div>' +
-          '<div><label class="f">ความกว้าง (ม.)</label><input type="number" step="0.01" min="0" data-tf="width" value="' + esc(pt.width == null ? '' : pt.width) + '"></div>' +
-          '<div><label class="f">ความลึก (ม.)</label><input type="number" step="0.01" min="0" data-tf="depth" value="' + esc(pt.depth == null ? '' : pt.depth) + '"></div>' +
+          '<div class="pf-text"><label class="f">ข้อความใต้หัวเรื่อง (พิมพ์ขึ้นบรรทัดใหม่ได้ตามต้องการ)</label><textarea data-tf="text" rows="4" placeholder="กม.44+000 ถึง กม.46+000 ทั้งสองด้าน&#10;ไหล่ทาง ถูกน้ำกัดเซาะ&#10;ลึก 30 ม.">' + esc(capText) + '</textarea></div>' +
           '<button class="btn btn-icon btn-danger pt-del" data-delpt="' + pt.id + '" title="ลบจุดนี้" aria-label="ลบจุดนี้">✕</button></div>' +
-          '<div class="pf-pt2"><div class="pf-extra"><label class="f">หมายเหตุเพิ่มเติม</label><input type="text" data-tf="extra" value="' + esc(pt.extra || '') + '"></div>' +
+          '<div class="pf-pt2">' +
           '<button class="btn btn-pmgr" data-pmgr-pt="' + slot + '" data-ptno="' + (k + 1) + '" title="เพิ่ม/ลบ/เรียงลำดับรูป เลือกจุดกึ่งกลาง และแบบจัดวาง (แนะนำ 2 รูป: ภาพรวม + ภาพระยะใกล้)">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน' + (n ? ' (' + n + ' รูป)' : '') + '</button></div></div>';
       });
-      h += '<div class="prob-foot"><button class="btn btn-sm" data-addpt="' + pr.id + '">+ เพิ่มจุดความเสียหาย</button><span class="small muted">แนะนำแนบ 2 รูปต่อจุด: ภาพรวม + ภาพระยะใกล้</span></div>' +
+      h += '<div class="prob-foot"><span class="small muted">แนะนำแนบ 2 รูปต่อเรื่อง: ภาพรวม + ภาพระยะใกล้</span></div>' +
         '<details class="prev"><summary>ดูตัวอย่างสไลด์</summary><div class="grid2" data-probprev="' + pr.id + '"></div></details></div>';
     });
     h += '<datalist id="objList"><option>ไหล่ทาง</option><option>ผิวจราจร</option><option>ลาดคันทาง</option><option>สะพาน</option><option>คอสะพาน</option><option>ท่อลอดเหลี่ยม</option><option>ท่อกลม</option><option>รางระบายน้ำ</option><option>ราวกันอันตราย</option><option>เกาะกลาง</option><option>ทางเท้า</option></datalist>' +
@@ -938,15 +932,6 @@
         const ids = S.photos.filter(function (x) { return x.mk === S.mk && String(x.slot).indexOf('prob:' + pid + ':') === 0; }).map(function (x) { return x.__id; });
         if (ids.length) await run(function () { return FBL.deletePhotos(ids); });
         saveProblems(problems().filter(function (x) { return x.id !== pid; }), true);
-      };
-    });
-    $$('[data-addpt]', p).forEach(function (b) {
-      b.onclick = function () {
-        const list = clone(problems());
-        const pr = list.find(function (x) { return x.id === b.getAttribute('data-addpt'); });
-        const last = (pr.points || [])[pr.points.length - 1] || {};
-        pr.points.push({ id: FBL.randomId(6), side: last.side || 'ด้านขวาทาง', object: last.object || '', damage: last.damage || '' });
-        saveProblems(list, true);
       };
     });
     $$('[data-delpt]', p).forEach(function (b) {
