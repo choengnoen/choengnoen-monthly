@@ -53,6 +53,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn-danger{color:var(--red);border-color:#efc4bd}
 .btn-danger:hover{background:var(--red-bg)}
 .btn-sm{padding:4px 10px;font-size:13px;border-radius:7px}
+.btn-pmgr{gap:8px;border:1.5px solid var(--navy-800);color:var(--navy-800);background:#fff}
+.btn-pmgr .ico{flex:none;color:var(--navy-700)}
+.btn-pmgr:hover{background:var(--navy-100);border-color:var(--navy-900)}
 .btn-icon{padding:4px 8px;font-size:13px;border-radius:7px}
 input[type=text],input[type=password],input[type=number],select,textarea{border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;width:100%}
 input:focus,select:focus,textarea:focus{outline:2px solid #9cc0ea;border-color:#6c9fd8}
@@ -135,7 +138,7 @@ main{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
 .card-head .sp{flex:1}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.unit-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;margin-bottom:4px}
+.unit-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:4px 10px;margin-bottom:4px}
 .unit-item{display:flex;align-items:center;gap:6px;min-width:0}
 .unit-item b{flex:none}
 .unit-item input,.unit-item select{padding:3px 8px;font-size:13px;min-width:0}

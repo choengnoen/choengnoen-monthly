@@ -641,6 +641,10 @@
       } });
   }
   // หน้าต่างจัดการรูปของสไลด์ (เพิ่ม/ลบ/เรียง/จุดกึ่งกลาง/แบบจัดวาง รวมที่เดียว) — วาดใหม่เองเมื่อข้อมูลรูปหรือรายงานเปลี่ยน
+  // ไอคอน photo-edit (Tabler, outline) ฝังเป็น SVG เพื่อไม่ต้องพึ่งไฟล์ฟอนต์ภายนอก
+  const PHOTO_EDIT_ICON = '<svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M15 8h.01"/><path d="M11 20h-4a3 3 0 0 1-3-3v-10a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v4"/><path d="M4 15l4-4c.928-.893 2.072-.893 3 0l3 3"/>' +
+    '<path d="M14 14l1-1c.31-.298.644-.497.987-.596"/><path d="M18.42 15.61a2.1 2.1 0 0 1 2.97 2.97l-3.39 3.42h-3v-3l3.42-3.39z"/></svg>';
   let photoMgr = null;   // { slot, lay: () => layout, bg }
   function photoMgrHtml() {
     const slot = photoMgr.slot, n = photosOf(slot).length;
@@ -750,7 +754,7 @@
         '<div>Unit Cost</div><div>' + ucTxt + '</div></div>' +
         (subPh.length && n < RE.MAX_PHOTOS ? '<button class="btn btn-sm" style="margin-bottom:8px" data-pullsub="' + a.code + '">ดึงรูปจากสไลด์รายรหัสย่อย (' + subPh.length + ' รูป)</button>' : '') +
         summaryHtml +
-        '<button class="btn" data-pmgr="' + a.code + '" title="เพิ่ม/ลบ/เรียงลำดับรูป เลือกจุดกึ่งกลาง และแบบจัดวาง">🖼 จัดการรูป · ' + n + '/' + RE.MAX_PHOTOS + ' รูป</button>' +
+        '<button class="btn btn-pmgr" data-pmgr="' + a.code + '" title="เพิ่ม/ลบ/เรียงลำดับรูป เลือกจุดกึ่งกลาง และแบบจัดวาง">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน · ' + n + '/' + RE.MAX_PHOTOS + '</button>' +
         '</div></div></div>';
     });
     h += '<datalist id="unitList"><option>ตร.ม.</option><option>ม.</option><option>ต้น</option><option>จุด</option><option>แห่ง</option><option>ลบ.ม.</option><option>ตัน</option><option>ชุด</option><option>ป้าย</option><option>งาน</option></datalist>';
