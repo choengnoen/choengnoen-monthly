@@ -325,12 +325,6 @@
     const ids = S.reports.map(function (r) { return r.__id; }).sort().reverse();
     $('#monthSel').innerHTML = ids.map(function (id) { return '<option value="' + id + '"' + (id === S.mk ? ' selected' : '') + '>รายงานเดือน ' + esc(RE.mkLabel(id)) + ' · ประชุม ' + esc(RE.mkLabel(RE.nextMk(id))) + '</option>'; }).join('');
     $$('#tabs button').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === S.tab); });
-    const recs = monthRecords();
-    $('#bImport').textContent = recs.length;
-    const aggs = slideAggs(RE.aggregate(recs));
-    const missing = aggs.filter(function (a) { return !photosOf('work:' + a.code).length && !(rep().exclude || {})[a.code]; }).length;
-    $('#bWork').textContent = missing ? missing + ' ไม่มีรูป' : aggs.length;
-    $('#bWork').classList.toggle('warn', !!missing);
   }
 
   function renderAll() {
@@ -354,11 +348,9 @@
     else { m = now.getMonth(); y = now.getFullYear() + 543; if (m === 0) { m = 12; y--; } }
     const years = [];
     for (let yy = now.getFullYear() + 544; yy >= now.getFullYear() + 541; yy--) years.push(yy);
-    const html = '<p class="small muted" style="margin-top:0">เลือก <b>เดือนของข้อมูลผลงาน</b> — หน้าปกจะขึ้นเป็นการประชุมเดือนถัดไปให้เอง (เช่น ข้อมูล สิงหาคม → ประชุม กันยายน)</p>' +
-      '<div class="grid2"><div><label class="f">เดือนของข้อมูล</label><select id="nmM">' +
+    const html = '<div class="grid2"><div><label class="f">เดือนของข้อมูล</label><select id="nmM">' +
       RE.MONTHS.map(function (n, i) { return '<option value="' + (i + 1) + '"' + (i + 1 === m ? ' selected' : '') + '>' + n + '</option>'; }).join('') +
-      '</select></div><div><label class="f">ปี (พ.ศ.)</label><select id="nmY">' + years.map(function (yy) { return '<option' + (yy === y ? ' selected' : '') + '>' + yy + '</option>'; }).join('') + '</select></div></div>' +
-      '<p class="small muted">หน่วยนับของแต่ละรหัสงานอ้างอิงจากฐานข้อมูลกลาง (รหัสงาน) — รหัสงานที่มีหลายหน่วย เลือกหน่วยของเดือนนี้ได้ที่แท็บรายรหัสงาน</p>';
+      '</select></div><div><label class="f">ปี (พ.ศ.)</label><select id="nmY">' + years.map(function (yy) { return '<option' + (yy === y ? ' selected' : '') + '>' + yy + '</option>'; }).join('') + '</select></div></div>';
     const r = await modal({ title: 'เริ่มรายงานเดือนใหม่', html: html, ok: 'สร้างรายงาน', read: function (bg) { return $('#nmY', bg).value + '-' + String($('#nmM', bg).value).padStart(2, '0'); } });
     if (!r) return;
     const mk = r;
@@ -396,13 +388,13 @@
   function renderImport() {
     const p = $('[data-panel="import"]');
     const recs = monthRecords().sort(function (a, b) { return a.code.localeCompare(b.code) || String(a.dates[0]).localeCompare(String(b.dates[0])); });
-    let h = '<div class="card"><div class="card-head"><h2>นำเข้าไฟล์ผลการปฏิบัติงาน · เดือน ' + esc(RE.mkLabel(S.mk)) + '</h2></div>' +
-      '<div class="drop" id="csvDrop"><b>เลือกไฟล์ CSV ทั้งหมดของเดือนมาวางที่นี่ (Export_CSV และ report01.csv รวมกันได้)</b>' +
-      (FBL.isPrivileged() ? '<br><span class="small muted">ระบบแยกให้เองว่าไฟล์ไหนเป็นผลการปฏิบัติงาน ไฟล์ไหนเป็นรายงานแผน-ผล (แผน-ผลจะถือเป็นผลสะสมถึงเดือน ' + esc(RE.mkLabel(S.mk)) + ')</span>' : '') + '</div>';
+    let h = '<div class="card"><div class="card-head"><h2>นำเข้าไฟล์ผลการปฏิบัติงาน</h2></div>' +
+      '<div class="drop" id="csvDrop"><b>เลือกไฟล์ CSV ทั้งหมดของเดือนมาวางที่นี่</b><br>(Export_CSV และ report01.csv รวมกันได้)</div>';
     if (S.pending) h += pendingHtml();
     h += '</div>';
 
     const aggs = RE.aggregate(recs);
+    p.setAttribute('data-tbl', 'c'); // สไตล์ตาราง: รวม ฟ้าเข้ม-ตัวเลขทอง
     h += '<div class="card"><div class="card-head"><h2>สรุปตามรหัสงาน</h2></div>';
     if (!aggs.length) h += '<div class="empty">ยังไม่มีข้อมูลของเดือนนี้ — นำเข้าไฟล์ CSV ด้านบน</div>';
     else {
@@ -419,53 +411,37 @@
     }
     h += '</div>';
 
-    h += '<div class="card"><div class="card-head"><h2>รายการที่บันทึกแล้ว (' + recs.length + ' ไฟล์)</h2>' +
-      (recs.length ? '<span class="small muted">ดับเบิลคลิกที่แถวเพื่อดูรายละเอียด / ลบรายการ</span>' : '') + '</div>';
+    h += '<div class="card"><div class="card-head"><h2>รายการที่บันทึกแล้ว (' + recs.length + ' ไฟล์)</h2></div>';
     if (recs.length) {
-      h += '<div class="tbl-wrap"><table class="tbl tbl-sum tbl-rec"><thead><tr><th class="c-no">#</th><th>รหัสงาน / ชื่องาน</th><th>สายทาง / กม.</th><th>วันที่ปฏิบัติงาน</th><th class="num">ปริมาณ</th><th class="num c-total">รวม (บาท)</th></tr></thead><tbody>';
+      const sumTotal = recs.reduce(function (s, r) { return s + (r.total || 0); }, 0);
+      h += '<div class="tbl-wrap"><table class="tbl tbl-sum tbl-rec"><thead><tr><th class="c-no">#</th><th>งาน</th><th>สายทาง / กม.</th><th>วันที่ปฏิบัติงาน</th><th class="num">ปริมาณ</th><th class="num c-total">รวม (บาท)</th><th class="c-del"></th></tr></thead><tbody>';
       recs.forEach(function (r, i) {
-        h += '<tr data-rec="' + esc(r.__id) + '" title="ดับเบิลคลิกเพื่อดูรายละเอียด"><td class="c-no muted">' + (i + 1) + '</td>' +
-          '<td class="c-name"><span class="code-tag">' + esc(r.code) + '</span> ' + esc(r.name) + '</td>' +
-          '<td class="nw">ทล.' + esc(r.route) + ' ตอน ' + esc(r.ctrl) + '<div class="small muted">กม. ' + esc(r.kmFrom) + ' – ' + esc(r.kmTo) + '</div></td>' +
+        h += '<tr title="' + esc(r.file) + '"><td class="c-no muted">' + (i + 1) + '</td>' +
+          '<td class="c-name"><span class="code-tag">' + esc(r.code) + '</span><div class="rec-nm">' + esc(RE.SHORT_NAMES[r.code] || r.name) + '</div></td>' +
+          '<td class="c-route" title="ตอนควบคุม ' + esc(r.ctrl) + '"><b>ทล.' + esc(r.route) + '</b> ตอน ' + esc(RE.sectionName(r.route, r.ctrl, null)) + ' <span class="km muted">กม. ' + esc(r.kmFrom) + '–' + esc(r.kmTo) + '</span></td>' +
           '<td class="small c-dates">' + compactDates(r.dates) + '</td>' +
-          '<td class="num nw">' + RE.fmtQty(r.qty) + ' <span class="small muted">' + esc(unitOf(r.code)) + '</span></td><td class="num c-total">' + RE.fmt(r.total) + '</td></tr>';
+          '<td class="num c-qty"><span class="q-n">' + RE.fmtQty(r.qty) + '</span><span class="q-u">' + esc(unitOf(r.code)) + '</span></td>' +
+          '<td class="num c-total">' + RE.fmt(r.total) + '</td>' +
+          '<td class="c-del"><button class="btn-trash" title="ลบรายการนี้" aria-label="ลบรายการนี้" data-del="' + esc(r.__id) + '"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button></td></tr>';
       });
-      h += '</tbody></table></div>';
+      h += '</tbody><tfoot><tr class="tot"><td colspan="5">รวม ' + recs.length + ' ไฟล์</td><td class="num c-total">' + RE.fmt(sumTotal) + '</td><td></td></tr></tfoot></table></div>';
     } else h += '<div class="empty">—</div>';
     h += '</div>';
     p.innerHTML = h;
 
     bindDrop($('#csvDrop'), '.csv,text/csv', true, importFiles);
-    $$('tr[data-rec]', p).forEach(function (tr) {
-      tr.ondblclick = function () {
-        window.getSelection && window.getSelection().removeAllRanges();
-        showRecord(tr.getAttribute('data-rec'));
-      };
+    $$('button[data-del]', p).forEach(function (b) {
+      b.onclick = function () { deleteRecord(b.getAttribute('data-del')); };
     });
     if (S.pending) bindPending(p);
   }
 
-  // หน้าต่างรายละเอียดของรายการที่บันทึกแล้ว (เปิดด้วยการดับเบิลคลิกแถว) — ลบรายการได้จากที่นี่
-  async function showRecord(id) {
+  // ลบรายการที่บันทึกแล้ว (ปุ่ม ลบ ท้ายแถวในตาราง) — ถามยืนยันก่อน
+  async function deleteRecord(id) {
     const r = S.records.find(function (x) { return x.__id === id; });
     if (!r) return;
-    const kv = function (k, v) { return '<div class="rec-k">' + k + '</div><div class="rec-v">' + v + '</div>'; };
-    const cost = function (k, v) { return '<div class="rec-cost"><span>' + k + '</span><b>' + RE.fmt(v || 0) + '</b></div>'; };
-    const html = '<div class="rec-head"><span class="code-tag">' + esc(r.code) + '</span> <b>' + esc(r.name) + '</b></div>' +
-      '<div class="rec-grid">' +
-      kv('สายทาง', 'ทล.' + esc(r.route) + ' ตอนควบคุม ' + esc(r.ctrl)) +
-      kv('ช่วง กม.', esc(r.kmFrom) + ' – ' + esc(r.kmTo)) +
-      kv('วันที่ปฏิบัติงาน', r.dates.map(RE.thDate).map(esc).join(', ') + ' <span class="muted">(' + r.days + ' วัน)</span>') +
-      kv('ปริมาณงาน', RE.fmtQty(r.qty) + ' ' + esc(unitOf(r.code))) +
-      kv('ไฟล์', esc(r.file)) +
-      kv('นำเข้าโดย', esc(r.importedBy || '—')) + '</div>' +
-      '<div class="rec-costs">' + cost('ค่าวัสดุ', r.mat) + cost('ค่าแรงงาน', r.lab) + cost('ค่าเช่า', r.rent) + cost('ค่าน้ำมัน', r.fuel) +
-      '<div class="rec-cost rec-total"><span>รวม (บาท)</span><b>' + RE.fmt(r.total) + '</b></div></div>' +
-      '<p class="small muted" style="margin-top:12px">ถ้าลบแล้ว สามารถนำเข้าไฟล์เดิมใหม่ได้ภายหลัง</p>';
-    if (await modal({ title: 'รายละเอียดรายการ', html: html, ok: 'ลบรายการนี้', danger: true, cancel: 'ปิด', wide: true })) {
-      if (await confirmBox('ยืนยันการลบ?', '<p>' + esc(r.file) + ' — รหัส ' + esc(r.code) + ' ทล.' + esc(r.route) + '</p>', 'ลบ', true))
-        run(function () { return FBL.del('records', id); }, 'ลบแล้ว');
-    }
+    if (await confirmBox('ยืนยันการลบ?', '<p>' + esc(r.file) + ' — รหัส ' + esc(r.code) + ' ทล.' + esc(r.route) + ' (' + RE.fmt(r.total) + ' บาท)</p><p class="small muted">ถ้าลบแล้ว สามารถนำเข้าไฟล์เดิมใหม่ได้ภายหลัง</p>', 'ลบ', true))
+      run(function () { return FBL.del('records', id); }, 'ลบแล้ว');
   }
 
   function pendingHtml() {
@@ -498,7 +474,7 @@
     return h;
   }
   function canSave(x) { return x.level === 'ok' || x.level === 'info' || (x.level === 'warn' && x.confirmed === true); }
-  // ย่อรายการวันที่: วันติดกันรวมเป็นช่วง ชื่อเดือนแสดงครั้งเดียว เช่น "1, 3–8, 10–15 ส.ค. (14 วัน)"
+  // ย่อรายการวันที่: วันติดกันรวมเป็นช่วง ชื่อเดือนแสดงครั้งเดียว เช่น "(14 วัน) 1, 3–8, 10–15 ส.ค."
   function compactDates(dates) {
     const ds = dates.slice().sort();
     const parts = [];
@@ -515,7 +491,7 @@
       }
       parts.push(rs.join(', ') + ' ' + RE.MONTHS_SHORT[Number(ym.slice(5, 7)) - 1]);
     }
-    return esc(parts.join(' · ')) + (ds.length > 1 ? ' <span class="muted">(' + ds.length + ' วัน)</span>' : '');
+    return '<span class="dchip">' + ds.length + ' วัน</span> ' + esc(parts.join(' · '));
   }
   function bindPending(p) {
     $$('[data-dec]', p).forEach(function (b) {
