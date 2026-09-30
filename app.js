@@ -738,7 +738,7 @@
       const unitHtml = a.merged
         ? '<div class="unit-grid">' + a.subs.map(function (c) { return '<div class="unit-item"><b class="small">' + c + '</b>' + unitFieldHtml(c) + '</div>'; }).join('') + '</div>' +
           a.subs.map(unitNoteHtml).join('')
-        : '<div class="row"><div style="width:130px"><label class="f">หน่วยนับ</label>' + unitFieldHtml(a.code) + '</div></div>' + unitNoteHtml(a.code);
+        : '<div class="row"><div class="unit-box"><label class="f">หน่วยนับ</label>' + unitFieldHtml(a.code) + '</div></div>' + unitNoteHtml(a.code);
       // สรุปจำนวนไฟล์/วันทำงาน/สายทาง — แสดงเหนือกล่อง + เพิ่มรูป
       const summaryHtml = '<div class="muted small" style="margin:0 0 8px">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + (a.merged ? ' รายการสายทาง' : ' สายทาง') + '</div>';
       const qtyTxt = a.merged ? a.qtyParts.map(function (q) { return RE.fmtQty(q.qty) + ' ' + esc(q.unit); }).join(' + ') : RE.fmtQty(a.qty) + ' ' + esc(unitOf(a.code));
