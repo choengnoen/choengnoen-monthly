@@ -65,6 +65,8 @@
   }
   // การตั้งค่าที่ใช้ทุกเดือน (config/settings) เช่น ตรากรมทางหลวงบนหน้าปก
   function settings() { return S.config.find(function (c) { return c.__id === 'settings'; }) || {}; }
+  // ตรากรมทางหลวง: ดึงจากฐานข้อมูลกลาง (master-client.js) — ไม่มี = ใช้ตราในรายงานเดิม (assets/cover-logo.png)
+  function emblem() { return (window.CNMaster && CNMaster.EMBLEM_URL) || ''; }
   function planOf(fy) { return S.plans.find(function (p) { return p.__id === String(fy); }) || null; }
   function validChoice(c, n) { return n > 0 && c != null && c !== '' && Number(c) < RE.templates(n).length ? Number(c) : null; }
   function photoSpec(p) { return { id: p.id || p.__id, w: p.w, h: p.h, fx: p.fx, fy: p.fy }; }
@@ -149,7 +151,7 @@
     return '<svg viewBox="0 0 100 60" width="100%" height="100%" preserveAspectRatio="none">' + out + '</svg>';
   }
   function slideHtml(spec, fullUrls) {
-    spec = RE.withLogo(spec, settings().logo);   // ตรามุมซ้ายบนของกรอบ (ถ้าอัปโหลดตราไว้)
+    spec = RE.withLogo(spec, emblem());   // ตรามุมซ้ายบนของกรอบ (ตราจากฐานข้อมูลกลาง)
     const thumbs = {};
     S.photos.forEach(function (p) { thumbs[p.__id] = (fullUrls && fullUrls[p.__id]) || p.thumb; });   // fullUrls = รูปเต็ม (ใช้ตอนส่งออก PDF)
     let h = '';
@@ -729,7 +731,7 @@
       return { g: g, subs: aggs.filter(function (a) { return a.group === g.code && RE.HIDDEN_WORK_CODES.indexOf(a.code) < 0; }) };
     }).filter(function (x) { return x.subs.length >= 2; });
     let h = '<div class="card"><div class="row"><h2 style="flex:1">รายรหัสงาน · ' + shown.length + ' สไลด์</h2></div>' +
-      (mergeable.length ? '<div style="margin:10px 0 0"><b class="small">แตะเพื่อรวมรหัสย่อยเป็นสไลด์เดียว</b><div class="mpills">' +
+      (mergeable.length ? '<div style="margin:10px 0 0"><div class="mpills">' +
         mergeable.map(function (x) {
           return '<label class="mpill' + (mg[x.g.code] ? ' on' : '') + '" title="' + esc(RE.groupName(x.g.code)) + ' — รวม ' + x.subs.map(function (a) { return a.code; }).join(', ') + '">' +
             '<input type="checkbox" data-merge="' + x.g.code + '"' + (mg[x.g.code] ? ' checked' : '') + '> ' +
@@ -813,7 +815,7 @@
      ====================================================================== */
   function coverSpec() {
     const c = photosOf('cover')[0];
-    return RE.slideCover({ mk: S.mk, meetingText: rep().meetingText, orgText: rep().orgText, cover: c ? photoSpec(c) : null, logo: settings().logo });
+    return RE.slideCover({ mk: S.mk, meetingText: rep().meetingText, orgText: rep().orgText, cover: c ? photoSpec(c) : null, logo: emblem() });
   }
   function problemSpecs(pr) {
     const pts = pr.points || [];
@@ -848,8 +850,7 @@
       '<label class="f" style="margin-top:10px">ข้อความบรรทัดบน</label><input type="text" id="orgText" placeholder="แขวงทางหลวงระยอง" value="' + esc(r.orgText || '') + '">' +
       '<label class="f" style="margin-top:14px">รูปหน้าปก (ใช้รูปแนวนอน)</label>' +
       '<button class="btn btn-pmgr" data-pmgr-cover="1" title="เปลี่ยนรูปปก และเลือกจุดกึ่งกลางของรูป">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน</button>' +
-      (photosOf('cover').length ? ' <button class="btn btn-sm" id="coverReset">ใช้รูปปกเริ่มต้น</button>' : '<p class="small muted">ตอนนี้ใช้รูปปกเริ่มต้น (ภาพถนนจากรายงานเดิม)</p>') +
-      logoHtml() + '</div></div></div>';
+      '</div></div></div>';
 
     h += '<div class="card"><div class="card-head"><h2>ปัญหา อุปสรรค</h2><div class="sp"></div><button class="btn btn-primary" id="addProb">+ เพิ่มเรื่องปัญหา/ความเสียหาย</button></div>' +
       '<p class="small muted" style="margin-top:0">กรอกเป็นช่อง ระบบเรียงข้อความบนสไลด์ให้ เช่น "กม.14+100 ด้านขวาทาง / ไหล่ทาง ถูกน้ำกัดเซาะ / ความยาว 12.00 ม. / ลึก 3.00 ม." — สไลด์ละ 3 จุด เกินกว่านั้นแยกสไลด์ให้อัตโนมัติ</p>';
@@ -974,7 +975,7 @@
     });
   }
   function liveCover() {
-    const spec = RE.slideCover({ mk: S.mk, meetingText: $('#meetingText').value.trim(), orgText: $('#orgText').value.trim(), cover: photosOf('cover')[0] ? photoSpec(photosOf('cover')[0]) : null, logo: settings().logo });
+    const spec = RE.slideCover({ mk: S.mk, meetingText: $('#meetingText').value.trim(), orgText: $('#orgText').value.trim(), cover: photosOf('cover')[0] ? photoSpec(photosOf('cover')[0]) : null, logo: emblem() });
     $('#coverPrev').innerHTML = slideHtml(spec);
   }
   function renderCoverPreview() { const el = $('#coverPrev'); if (el) { el.innerHTML = slideHtml(coverSpec()); bindSlideClicks(el); } }
@@ -1265,7 +1266,7 @@
           $('#expTxt').textContent = 'กำลังโหลดรูปจาก Google Drive… ' + n + '/' + total + ' รูป';
         });
       }
-      const logo = settings().logo;
+      const logo = emblem();
       const pptx = await RE.buildPptx(specs.map(function (s) { return RE.withLogo(s, logo); }), FBL.photoBytes, function (msg) {
         step++; bar.style.width = Math.min(95, 40 + step / specs.length * 55) + '%'; $('#expTxt').textContent = msg;
       });
