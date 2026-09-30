@@ -705,12 +705,11 @@
   }
   function unitNoteHtml(code) {
     const ch = unitChoices(code);
-    const link = window.CNMaster && CNMaster.editUrl ? ' <a href="' + esc(CNMaster.editUrl('workcodes')) + '" target="_blank" rel="noopener">แก้ไขที่ฐานข้อมูลกลาง</a>' : '';
-    if (ch.length > 1) return '<p class="small muted" style="margin:4px 0 0">รหัสงานนี้มี ' + ch.length + ' หน่วย (' + ch.map(esc).join(' / ') + ') เลือกหน่วยที่ตรงกับปริมาณงานของเดือนนี้' + link + '</p>';
+    if (ch.length > 1) return '<p class="small muted" style="margin:4px 0 0">รหัสงานนี้มี ' + ch.length + ' หน่วย (' + ch.map(esc).join(' / ') + ')</p>';
     if (ch.length === 1) return '';
     let hubReady = false;
     try { hubReady = !!(window.CNMaster && CNMaster.workCodes && CNMaster.workCodes().length); } catch (e) { /* ข้าม */ }
-    return '<p class="small" style="margin:4px 0 0;color:#b45309">' + (hubReady ? 'ไม่พบรหัสงาน ' + code + ' (หรือยังไม่ได้กำหนดหน่วยนับ) ในฐานข้อมูลกลาง — พิมพ์หน่วยเองชั่วคราว' : 'ยังเชื่อมต่อฐานข้อมูลกลางไม่ได้ — ใช้หน่วยนับสำรอง') + link + '</p>';
+    return '<p class="small" style="margin:4px 0 0;color:#b45309">' + (hubReady ? 'ไม่พบรหัสงาน ' + code + ' (หรือยังไม่ได้กำหนดหน่วยนับ) ในฐานข้อมูลกลาง — พิมพ์หน่วยเองชั่วคราว' : 'ยังเชื่อมต่อฐานข้อมูลกลางไม่ได้ — ใช้หน่วยนับสำรอง') + '</p>';
   }
   function renderWork() {
     const p = $('[data-panel="work"]');
@@ -725,12 +724,13 @@
       return { g: g, subs: aggs.filter(function (a) { return a.group === g.code && RE.HIDDEN_WORK_CODES.indexOf(a.code) < 0; }) };
     }).filter(function (x) { return x.subs.length >= 2; });
     let h = '<div class="card"><div class="row"><h2 style="flex:1">รายรหัสงาน · ' + shown.length + ' สไลด์</h2></div>' +
-      (mergeable.length ? '<div style="margin:10px 0 0"><b class="small">รวมรหัสย่อยเป็นสไลด์เดียว (ตามกลุ่มงาน)</b>' +
+      (mergeable.length ? '<div style="margin:10px 0 0"><b class="small">แตะเพื่อรวมรหัสย่อยเป็นสไลด์เดียว</b><div class="mpills">' +
         mergeable.map(function (x) {
-          return '<div class="small" style="margin-top:4px"><label><input type="checkbox" data-merge="' + x.g.code + '"' + (mg[x.g.code] ? ' checked' : '') + '> ' +
-            '<b>' + x.g.code + '</b> ' + esc(RE.groupName(x.g.code)) + ' — รวม ' + x.subs.map(function (a) { return a.code; }).join(', ') + ' (' + x.subs.length + ' สไลด์ → 1 สไลด์)</label></div>';
+          return '<label class="mpill' + (mg[x.g.code] ? ' on' : '') + '" title="' + esc(RE.groupName(x.g.code)) + ' — รวม ' + x.subs.map(function (a) { return a.code; }).join(', ') + '">' +
+            '<input type="checkbox" data-merge="' + x.g.code + '"' + (mg[x.g.code] ? ' checked' : '') + '> ' +
+            '<b>' + x.g.code + '</b> ' + esc(RE.groupName(x.g.code)) + ' · ' + x.subs.length + '→1</label>';
         }).join('') +
-        '</div>' : '') + '</div>';
+        '</div></div>' : '') + '</div>';
     shown.forEach(function (a) {
       const slot = 'work:' + a.code;
       const spec = workSpec(a);
@@ -754,7 +754,7 @@
         '<div>Unit Cost</div><div>' + ucTxt + '</div></div>' +
         (subPh.length && n < RE.MAX_PHOTOS ? '<button class="btn btn-sm" style="margin-bottom:8px" data-pullsub="' + a.code + '">ดึงรูปจากสไลด์รายรหัสย่อย (' + subPh.length + ' รูป)</button>' : '') +
         summaryHtml +
-        '<button class="btn btn-pmgr" data-pmgr="' + a.code + '" title="เพิ่ม/ลบ/เรียงลำดับรูป เลือกจุดกึ่งกลาง และแบบจัดวาง">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน · ' + n + '/' + RE.MAX_PHOTOS + '</button>' +
+        '<button class="btn btn-pmgr" data-pmgr="' + a.code + '" title="เพิ่ม/ลบ/เรียงลำดับรูป เลือกจุดกึ่งกลาง และแบบจัดวาง">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน</button>' +
         '</div></div></div>';
     });
     h += '<datalist id="unitList"><option>ตร.ม.</option><option>ม.</option><option>ต้น</option><option>จุด</option><option>แห่ง</option><option>ลบ.ม.</option><option>ตัน</option><option>ชุด</option><option>ป้าย</option><option>งาน</option></datalist>';

@@ -282,6 +282,13 @@ table.tbl-rec .c-del{text-align:center;padding-left:4px;padding-right:8px}
 .pill.warn{background:var(--amber-bg);color:var(--amber)}
 .pill.err{background:var(--red-bg);color:var(--red)}
 .pill.info{background:var(--navy-100);color:var(--navy-700)}
+.mpills{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.mpill{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:99px;border:1px solid var(--line,#cbd5e1);font-size:13px;cursor:pointer;color:var(--ink-mute);background:transparent;transition:background .15s,color .15s}
+.mpill input{position:absolute;opacity:0;pointer-events:none}
+.mpill:hover{border-color:var(--navy-700)}
+.mpill.on{background:var(--navy-900);border-color:var(--navy-900);color:#fff}
+.mpill b{font-weight:700}
+.mpill:focus-within{outline:2px solid var(--navy-700);outline-offset:2px}
 ul.issues{margin:6px 0 0;padding-left:18px;font-size:13px}
 ul.issues li.error{color:var(--red)} ul.issues li.warn{color:var(--amber)} ul.issues li.info{color:var(--ink-soft)}
 /* ตารางผลตรวจไฟล์ก่อนบันทึก */
