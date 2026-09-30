@@ -271,7 +271,7 @@
     const my = ++session;
     // โหลดข้อมูลให้เสร็จก่อนค่อยสลับหน้า — ไม่ให้เห็นหน้าระบบว่าง ๆ แล้วค่อยกระโดดเป็นข้อมูล
     loginWait('กำลังโหลดข้อมูล…');
-    const onChange = function (col, docs) { S[col] = docs; if (col === 'photos') S.photos.forEach(function (p) { p.id = p.__id; }); scheduleRender(col); };
+    const onChange = function (col, docs) { S[col] = docs; if (col === 'photos') S.photos.forEach(function (p) { p.id = p.__id; }); scheduleRender(col); if (col === 'photos' || col === 'reports') refreshPhotoMgr(); };
     const got = await Promise.all(['reports', 'records', 'photos', 'plans', 'config'].map(function (c) { return FBL.watch(c, onChange); }));
     if (my !== session || !FBL.user) return;   // ออกจากระบบไประหว่างโหลด
     S.reports = got[0]; S.records = got[1]; S.photos = got[2]; S.plans = got[3]; S.config = got[4];
@@ -640,6 +640,32 @@
         };
       } });
   }
+  // หน้าต่างจัดการรูปของสไลด์ (เพิ่ม/ลบ/เรียง/จุดกึ่งกลาง/แบบจัดวาง รวมที่เดียว) — วาดใหม่เองเมื่อข้อมูลรูปหรือรายงานเปลี่ยน
+  let photoMgr = null;   // { slot, lay: () => layout, bg }
+  function photoMgrHtml() {
+    const slot = photoMgr.slot, n = photosOf(slot).length;
+    return '<div class="drop small" data-pdrop="' + esc(slot) + '"><b>+ เพิ่มรูป</b> ลากมาวาง หรือคลิกเลือก<br><span class="muted">ตอนนี้ ' + n + '/' + RE.MAX_PHOTOS + ' รูป · แนะนำ 4 รูป</span></div>' +
+      thumbsHtml(slot) + layoutSelectHtml(slot, n, photoMgr.lay());
+  }
+  function bindPhotoMgr(root) {
+    bindThumbs(root);
+    bindLayoutSelects(root);
+    $$('[data-pdrop]', root).forEach(function (d) { bindDrop(d, 'image/*', true, function (files) { addPhotos(files, d.getAttribute('data-pdrop')); }); });
+  }
+  function openPhotoMgr(slot, title, lay) {
+    photoMgr = { slot: slot, lay: lay, bg: null };
+    const mine = photoMgr;
+    modal({ title: title, ok: false, cancel: 'ปิด', wide: true, html: '<div id="pmBody">' + photoMgrHtml() + '</div>',
+      onOpen: function (bg) { mine.bg = bg; bindPhotoMgr($('#pmBody', bg)); } })
+      .then(function () { if (photoMgr === mine) photoMgr = null; });
+  }
+  function refreshPhotoMgr() {
+    if (!photoMgr || !photoMgr.bg) return;
+    if (!document.body.contains(photoMgr.bg)) { photoMgr = null; return; }
+    const body = $('#pmBody', photoMgr.bg);
+    body.innerHTML = photoMgrHtml();
+    bindPhotoMgr(body);
+  }
   function layoutSelectHtml(slot, n, lay) {
     if (n < 2) return '';
     const cur = validChoice((rep().layouts || {})[slot], n);
@@ -724,15 +750,22 @@
         '<div>Unit Cost</div><div>' + ucTxt + '</div></div>' +
         (subPh.length && n < RE.MAX_PHOTOS ? '<button class="btn btn-sm" style="margin-bottom:8px" data-pullsub="' + a.code + '">ดึงรูปจากสไลด์รายรหัสย่อย (' + subPh.length + ' รูป)</button>' : '') +
         summaryHtml +
-        '<div class="drop small" data-pdrop="' + slot + '"><b>+ เพิ่มรูป</b> ลากมาวาง หรือคลิกเลือก<br><span class="muted">ตอนนี้ ' + n + '/' + RE.MAX_PHOTOS + ' รูป · แนะนำ 4 รูป</span></div>' +
-        thumbsHtml(slot) + layoutSelectHtml(slot, n, spec.layout) + '</div></div></div>';
+        '<button class="btn" data-pmgr="' + a.code + '" title="เพิ่ม/ลบ/เรียงลำดับรูป เลือกจุดกึ่งกลาง และแบบจัดวาง">🖼 จัดการรูป · ' + n + '/' + RE.MAX_PHOTOS + ' รูป</button>' +
+        '</div></div></div>';
     });
     h += '<datalist id="unitList"><option>ตร.ม.</option><option>ม.</option><option>ต้น</option><option>จุด</option><option>แห่ง</option><option>ลบ.ม.</option><option>ตัน</option><option>ชุด</option><option>ป้าย</option><option>งาน</option></datalist>';
     p.innerHTML = h;
     bindSlideClicks(p);
-    bindThumbs(p);
-    bindLayoutSelects(p);
-    $$('[data-pdrop]', p).forEach(function (d) { bindDrop(d, 'image/*', true, function (files) { addPhotos(files, d.getAttribute('data-pdrop')); }); });
+    $$('[data-pmgr]', p).forEach(function (b) {
+      b.onclick = function () {
+        const code = b.getAttribute('data-pmgr');
+        const a = shown.find(function (x) { return x.code === code; });
+        openPhotoMgr('work:' + code, 'จัดการรูป · รหัส ' + code + (a ? ' ' + a.name : ''), function () {
+          const cur = slideAggs(RE.aggregate(monthRecords())).find(function (x) { return x.code === code; });
+          return cur ? workSpec(cur).layout : { name: '' };
+        });
+      };
+    });
     $$('[data-excl]', p).forEach(function (c) {
       c.onchange = function () { const e2 = Object.assign({}, rep().exclude || {}); e2[c.getAttribute('data-excl')] = c.checked; run(function () { return saveReport({ exclude: e2 }); }); };
     });
