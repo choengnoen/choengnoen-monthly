@@ -349,10 +349,27 @@ table.pend tr.skip td:last-child{opacity:1}
 .kv div:nth-child(even){text-align:right;font-variant-numeric:tabular-nums}
 
 /* ปัญหา */
-.prob{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;background:#fcfdfe}
-.pt{border-top:1px dashed var(--line);padding-top:12px;margin-top:12px}
-.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.prob{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px;background:#fcfdfe}
+.prob-h{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+.prob-h h3{flex:1;margin:0;font-size:15px}
+.prob input,.prob select{padding:5px 8px;font-size:13.5px}
+.prob label.f{font-size:12px;margin-bottom:2px}
+.pt{border-top:1px dashed var(--line);padding-top:8px;margin-top:8px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
 .fgrid .w2{grid-column:span 2}
+.pf-head{display:grid;grid-template-columns:110px 1.5fr 1fr 1.5fr;gap:8px}
+.pf-pt{display:grid;grid-template-columns:30px 1fr 1.1fr 1.1fr 1.4fr 72px 72px 72px 30px;gap:8px;align-items:end}
+.pf-pt2{display:flex;gap:8px;align-items:end;margin-top:6px;flex-wrap:wrap}
+.pf-pt2 .pf-extra{flex:1;min-width:200px}
+.pf-pt2 .btn-pmgr{padding:5px 12px;font-size:13px;white-space:nowrap}
+.pt-no{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--navy-100);color:var(--navy-800);font-weight:700;font-size:13px}
+.pt-del{padding:0;width:26px;height:26px;justify-content:center;line-height:1}
+.prob-foot{display:flex;gap:10px;align-items:center;margin-top:8px}
+details.prev{margin-top:8px}
+details.prev>summary{cursor:pointer;font-size:13px;color:var(--ink-soft);user-select:none}
+details.prev[open]>summary{margin-bottom:8px}
+details.prev .grid2{grid-template-columns:repeat(auto-fill,minmax(260px,320px));gap:12px}
+@media (max-width:1000px){.pf-head{grid-template-columns:1fr 1fr}.pf-pt{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}.pf-pt .pt-no{display:none}}
 
 /* หน้าต่าง / แจ้งเตือน */
 /* รูปแบบเดียวกับระบบอุบัติเหตุ (พื้นหลังเบลอ มุมโค้ง 20px ปุ่ม × กลม เลื่อนเฉพาะเนื้อหา) แต่ใช้โทนฟ้าของระบบนี้ */

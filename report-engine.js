@@ -337,14 +337,22 @@
     '21422': 'งานบำรุงรักษา ราวกันอันตรายฯ',
     '21660': 'งานบริหารอำนวยการฯ'
   };
-  RE.aggregate = function (records) {
+  // unitOfRec(record) → หน่วยนับของไฟล์นั้น (ไฟล์ในรหัสงานเดียวกันหน่วยต่างกันได้)
+  //   ส่งมา = ได้ qtyParts (ปริมาณ/ค่าใช้จ่าย/Unit Cost แยกตามหน่วย) + sameUnit, สายทางแยกบรรทัดตามหน่วย
+  //   หลายหน่วย = บวกปริมาณข้ามหน่วยไม่ได้ → qty / unitCost / perDay เป็น 0 (แสดง "-")
+  RE.aggregate = function (records, unitOfRec) {
     const by = {};
     records.forEach(function (r) {
-      const a = by[r.code] = by[r.code] || { code: r.code, name: RE.SHORT_NAMES[r.code] || r.name, group: r.group, qty: 0, days: 0, mat: 0, lab: 0, rent: 0, fuel: 0, total: 0, count: 0, lineMap: {}, records: [] };
+      const a = by[r.code] = by[r.code] || { code: r.code, name: RE.SHORT_NAMES[r.code] || r.name, group: r.group, qty: 0, days: 0, mat: 0, lab: 0, rent: 0, fuel: 0, total: 0, count: 0, lineMap: {}, partMap: {}, records: [] };
+      const u = unitOfRec ? unitOfRec(r) : '';
       a.qty += r.qty; a.days += r.days; a.mat += r.mat; a.lab += r.lab; a.rent += r.rent; a.fuel += r.fuel; a.total += r.total; a.count++;
       a.records.push(r);
-      const k = r.route + '/' + r.ctrl;
-      const L = a.lineMap[k] = a.lineMap[k] || { route: r.route, ctrl: r.ctrl, fromM: r.kmFromM, toM: r.kmToM, qty: 0 };
+      if (u) {
+        const P = a.partMap[u] = a.partMap[u] || { unit: u, qty: 0, days: 0, total: 0 };
+        P.qty += r.qty; P.days += r.days; P.total += r.total;
+      }
+      const k = r.route + '/' + r.ctrl + (u ? '/' + u : '');
+      const L = a.lineMap[k] = a.lineMap[k] || { route: r.route, ctrl: r.ctrl, fromM: r.kmFromM, toM: r.kmToM, qty: 0, unit: u };
       if (r.kmFromM != null && (L.fromM == null || r.kmFromM < L.fromM)) L.fromM = r.kmFromM;
       if (r.kmToM != null && (L.toM == null || r.kmToM > L.toM)) L.toM = r.kmToM;
       L.qty += r.qty;
@@ -357,6 +365,15 @@
       ['qty', 'mat', 'lab', 'rent', 'fuel', 'total'].forEach(function (k) { a[k] = round2(a[k]); });
       a.unitCost = a.qty ? a.total / a.qty : 0;
       a.perDay = a.days ? a.qty / a.days : 0;
+      if (unitOfRec) {
+        a.qtyParts = Object.keys(a.partMap).map(function (u) {
+          const P = a.partMap[u];
+          return { unit: u, qty: round2(P.qty), days: P.days, total: round2(P.total), unitCost: P.qty ? P.total / P.qty : 0, perDay: P.days ? P.qty / P.days : 0 };
+        });
+        a.sameUnit = a.qtyParts.length === 1;
+        if (!a.sameUnit) { a.qty = 0; a.unitCost = 0; a.perDay = 0; }
+      }
+      delete a.partMap;
       return a;
     });
   };
@@ -382,14 +399,20 @@
       m.units[a.code] = u;
       ['days', 'mat', 'lab', 'rent', 'fuel', 'total', 'count'].forEach(function (k) { m[k] += a[k]; });
       m.records = m.records.concat(a.records);
-      a.lines.forEach(function (L) { m.lines.push(Object.assign({ code: a.code, unit: u }, L)); });
-      byUnit[u] = byUnit[u] || { unit: u, qty: 0, days: 0 };
-      byUnit[u].qty += a.qty; byUnit[u].days += a.days;
+      a.lines.forEach(function (L) { m.lines.push(Object.assign({ code: a.code }, L, { unit: L.unit || u })); });
+      // รหัสย่อยที่แยกหน่วยตามไฟล์แล้ว (มี qtyParts) ใช้ปริมาณแยกหน่วยของมัน
+      (a.qtyParts || [{ unit: u, qty: a.qty, days: a.days, total: a.total }]).forEach(function (q) {
+        byUnit[q.unit] = byUnit[q.unit] || { unit: q.unit, qty: 0, days: 0, total: 0 };
+        byUnit[q.unit].qty += q.qty; byUnit[q.unit].days += q.days; byUnit[q.unit].total += q.total;
+      });
     });
     // เรียงรายสายทางให้สายเดียวกันอยู่ติดกัน แล้วตาม กม. และรหัสงาน
     m.lines.sort(function (x, y) { return (parseFloat(x.route) - parseFloat(y.route)) || (x.fromM - y.fromM) || x.code.localeCompare(y.code); });
     ['mat', 'lab', 'rent', 'fuel', 'total'].forEach(function (k) { m[k] = round2(m[k]); });
-    m.qtyParts = Object.keys(byUnit).map(function (u) { return { unit: u, qty: round2(byUnit[u].qty), days: byUnit[u].days }; });
+    m.qtyParts = Object.keys(byUnit).map(function (u) {
+      const b = byUnit[u];
+      return { unit: u, qty: round2(b.qty), days: b.days, total: round2(b.total), unitCost: b.qty ? b.total / b.qty : 0, perDay: b.days ? b.qty / b.days : 0 };
+    });
     // หน่วยเดียวกันทั้งกลุ่ม = คิด Unit Cost / ผลงานเฉลี่ยได้ · หลายหน่วย = บวกปริมาณข้ามหน่วยไม่ได้
     m.sameUnit = m.qtyParts.length === 1;
     m.qty = m.sameUnit ? m.qtyParts[0].qty : 0;
@@ -822,8 +845,8 @@
       els.push({ type: 'line', x: 14.013, y: lineY[i], w: 4.942, color: '444444', lineW: 0.75 });
     });
     // สไลด์รวมที่มีหลายหน่วยนับ: Unit Cost / ผลงานเฉลี่ย คิดรวมไม่ได้ → แสดง "-"
-    const noRate = a.merged && !a.sameUnit;
-    if (a.merged && a.sameUnit) unit = a.qtyParts[0].unit;
+    const noRate = a.sameUnit === false;
+    if (a.qtyParts && a.sameUnit) unit = a.qtyParts[0].unit;
     const perDayTxt = noRate ? '-' : a.perDay >= 100 ? RE.fmt(a.perDay, 0) : RE.fmt(a.perDay, 2);
     // [หัวข้อ, ค่า, หน่วย, สีค่า, y หัวข้อ, y ค่า, y หน่วย, x หน่วย, หน่วยตัวหนา+เอียง]
     const tot = [

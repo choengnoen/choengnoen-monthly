@@ -63,6 +63,12 @@
     if (picked && (!ch.length || ch.indexOf(picked) >= 0)) return picked;
     return ch[0] || RE.DEFAULT_UNITS[code] || 'หน่วย';
   }
+  // หน่วยนับของแต่ละไฟล์ (record) — เลือกแยกได้ใน rep().recUnits[__id] · ไม่ได้เลือก = หน่วยตั้งต้นของรหัสงาน (unitOf)
+  function unitOfRec(r) {
+    const picked = (rep().recUnits || {})[r.__id];
+    return picked || unitOf(r.code);
+  }
+  function aggr(recs) { return RE.aggregate(recs, unitOfRec); }
   // การตั้งค่าที่ใช้ทุกเดือน (config/settings) เช่น ตรากรมทางหลวงบนหน้าปก
   function settings() { return S.config.find(function (c) { return c.__id === 'settings'; }) || {}; }
   // ตรากรมทางหลวง: ดึงจากฐานข้อมูลกลาง (master-client.js) — ไม่มี = ใช้ตราในรายงานเดิม (assets/cover-logo.png)
@@ -395,7 +401,7 @@
     if (S.pending) h += pendingHtml();
     h += '</div>';
 
-    const aggs = RE.aggregate(recs);
+    const aggs = aggr(recs);
     p.setAttribute('data-tbl', 'c'); // สไตล์ตาราง: รวม ฟ้าเข้ม-ตัวเลขทอง
     h += '<div class="card"><div class="card-head"><h2>สรุปตามรหัสงาน</h2></div>';
     if (!aggs.length) h += '<div class="empty">ยังไม่มีข้อมูลของเดือนนี้ — นำเข้าไฟล์ CSV ด้านบน</div>';
@@ -406,8 +412,8 @@
       aggs.forEach(function (a) {
         ['mat', 'lab', 'rent', 'fuel', 'total'].forEach(function (k) { T[k] += a[k]; });
         const hid = RE.HIDDEN_WORK_CODES.indexOf(a.code) >= 0;
-        h += '<tr><td class="c-code"><b>' + a.code + '</b></td><td class="c-name">' + esc(a.name) + (hid ? ' <span class="pill info">ไม่ทำสไลด์</span>' : '') + '</td><td class="num">' + a.count + '</td><td class="num">' + RE.fmtQty(a.qty) + '</td><td class="c-unit">' + esc(unitOf(a.code)) + '</td><td class="num">' + a.days + '</td>' +
-          money(a.mat, 'g-start') + money(a.lab) + money(a.rent) + money(a.fuel) + '<td class="num g-start c-total">' + RE.fmt(a.total) + '</td><td class="num g-start">' + RE.fmt(a.unitCost) + '</td><td class="num">' + RE.fmt(a.perDay, a.perDay >= 100 ? 0 : 2) + '</td></tr>';
+        h += '<tr><td class="c-code"><b>' + a.code + '</b></td><td class="c-name">' + esc(a.name) + (hid ? ' <span class="pill info">ไม่ทำสไลด์</span>' : '') + '</td><td class="num">' + a.count + '</td><td class="num">' + a.qtyParts.map(function (q) { return RE.fmtQty(q.qty); }).join('<br>') + '</td><td class="c-unit">' + a.qtyParts.map(function (q) { return esc(q.unit); }).join('<br>') + '</td><td class="num">' + a.days + '</td>' +
+          money(a.mat, 'g-start') + money(a.lab) + money(a.rent) + money(a.fuel) + '<td class="num g-start c-total">' + RE.fmt(a.total) + '</td><td class="num g-start">' + a.qtyParts.map(function (q) { return RE.fmt(q.unitCost); }).join('<br>') + '</td><td class="num">' + a.qtyParts.map(function (q) { return RE.fmt(q.perDay, q.perDay >= 100 ? 0 : 2); }).join('<br>') + '</td></tr>';
       });
       h += '</tbody><tfoot><tr class="tot"><td colspan="6">รวมทั้งเดือน (' + aggs.length + ' รหัสงาน)</td><td class="num g-start">' + RE.fmt(T.mat) + '</td><td class="num">' + RE.fmt(T.lab) + '</td><td class="num">' + RE.fmt(T.rent) + '</td><td class="num">' + RE.fmt(T.fuel) + '</td><td class="num g-start c-total">' + RE.fmt(T.total) + '</td><td colspan="2" class="g-start"></td></tr></tfoot></table></div>';
     }
@@ -422,7 +428,7 @@
           '<td class="c-name"><span class="code-tag">' + esc(r.code) + '</span><div class="rec-nm">' + esc(RE.SHORT_NAMES[r.code] || r.name) + '</div></td>' +
           '<td class="c-route" title="ตอนควบคุม ' + esc(r.ctrl) + '"><b>ทล.' + esc(r.route) + '</b> ตอน ' + esc(RE.sectionName(r.route, r.ctrl, null)) + ' <span class="km muted">กม. ' + esc(r.kmFrom) + '–' + esc(r.kmTo) + '</span></td>' +
           '<td class="small c-dates">' + compactDates(r.dates) + '</td>' +
-          '<td class="num c-qty"><span class="q-n">' + RE.fmtQty(r.qty) + '</span><span class="q-u">' + esc(unitOf(r.code)) + '</span></td>' +
+          '<td class="num c-qty"><span class="q-n">' + RE.fmtQty(r.qty) + '</span><span class="q-u">' + esc(unitOfRec(r)) + '</span></td>' +
           '<td class="num c-total">' + RE.fmt(r.total) + '</td>' +
           '<td class="c-del"><button class="btn-trash" title="ลบรายการนี้" aria-label="ลบรายการนี้" data-del="' + esc(r.__id) + '"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button></td></tr>';
       });
@@ -718,9 +724,35 @@
     try { hubReady = !!(window.CNMaster && CNMaster.workCodes && CNMaster.workCodes().length); } catch (e) { /* ข้าม */ }
     return '<p class="small" style="margin:4px 0 0;color:#b45309">' + (hubReady ? 'ไม่พบรหัสงาน ' + code + ' (หรือยังไม่ได้กำหนดหน่วยนับ) ในฐานข้อมูลกลาง — พิมพ์หน่วยเองชั่วคราว' : 'ยังเชื่อมต่อฐานข้อมูลกลางไม่ได้ — ใช้หน่วยนับสำรอง') + '</p>';
   }
+  // หน่วยนับแยกตามไฟล์: 1 รหัสงานมีหลายหน่วย = เลือกจากรายการ · หน่วยเดียว = แสดงอย่างเดียว · ไม่มีในฐานข้อมูลกลาง = พิมพ์เอง
+  function recUnitFieldHtml(r) {
+    const ch = unitChoices(r.code), cur = unitOfRec(r), id = esc(r.__id);
+    if (ch.length > 1) {
+      const opts = ch.indexOf(cur) >= 0 ? ch : ch.concat([cur]);
+      return '<select data-recunit="' + id + '">' + opts.map(function (u) { return '<option' + (u === cur ? ' selected' : '') + '>' + esc(u) + '</option>'; }).join('') + '</select>';
+    }
+    if (ch.length === 1) return '<input type="text" value="' + esc(cur) + '" readonly>';
+    return '<input type="text" list="unitList" data-recunit="' + id + '" value="' + esc(cur) + '">';
+  }
+  function recUnitsHtml(a) {
+    const recs = a.records || [];
+    if (!recs.some(function (r) { return unitChoices(r.code).length !== 1; })) return '';   // ทุกรหัสมีหน่วยเดียว = ไม่มีอะไรให้เลือก
+    const all = [];
+    recs.forEach(function (r) { unitChoices(r.code).forEach(function (u) { if (all.indexOf(u) < 0) all.push(u); }); });
+    let h = '<div style="margin:12px 0 0"><label class="f">หน่วยนับแยกตามไฟล์' + (a.sameUnit ? '' : ' <span class="pill info">มี ' + a.qtyParts.length + ' หน่วยในเดือนนี้</span>') + '</label>' +
+      '<div class="tbl-wrap"><table class="tbl tbl-sum"><thead><tr><th>วันที่</th>' + (a.merged ? '<th>รหัส</th>' : '') + '<th>สายทาง / กม.</th><th class="num">ปริมาณ</th><th>หน่วย</th></tr></thead><tbody>';
+    recs.forEach(function (r) {
+      h += '<tr title="' + esc(r.file) + '"><td class="small">' + compactDates(r.dates) + '</td>' + (a.merged ? '<td>' + esc(r.code) + '</td>' : '') +
+        '<td class="small">ทล.' + esc(r.route) + ' <span class="km muted">กม. ' + esc(r.kmFrom) + '–' + esc(r.kmTo) + '</span></td>' +
+        '<td class="num">' + RE.fmtQty(r.qty) + '</td><td>' + recUnitFieldHtml(r) + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    if (all.length > 1) h += '<p class="small muted" style="margin:6px 0 0">ตั้งทุกไฟล์เป็น: <select data-allunit="' + a.code + '"><option value="">— เลือก —</option>' + all.map(function (u) { return '<option>' + esc(u) + '</option>'; }).join('') + '</select></p>';
+    return h + '</div>';
+  }
   function renderWork() {
     const p = $('[data-panel="work"]');
-    const aggs = RE.aggregate(monthRecords());
+    const aggs = aggr(monthRecords());
     const shown = slideAggs(aggs);
     const hidden = aggs.filter(function (a) { return RE.HIDDEN_WORK_CODES.indexOf(a.code) >= 0; });
     if (!aggs.length) { p.innerHTML = '<div class="card empty"><h2>ยังไม่มีข้อมูลผลงานของเดือนนี้</h2><p>ไปที่แท็บ ① นำเข้าข้อมูล ก่อน</p></div>'; return; }
@@ -745,18 +777,19 @@
       const unitHtml = a.merged
         ? '<div class="unit-grid">' + a.subs.map(function (c) { return '<div class="unit-item"><b class="small">' + c + '</b>' + unitFieldHtml(c) + '</div>'; }).join('') + '</div>' +
           a.subs.map(unitNoteHtml).join('')
-        : '<div class="row"><div class="unit-box"><label class="f">หน่วยนับ</label>' + unitFieldHtml(a.code) + '</div></div>' + unitNoteHtml(a.code);
+        : '<div class="row"><div class="unit-box"><label class="f">หน่วยนับตั้งต้น</label>' + unitFieldHtml(a.code) + '</div></div>' + unitNoteHtml(a.code);
       // สรุปจำนวนไฟล์/วันทำงาน/สายทาง — แสดงเหนือกล่อง + เพิ่มรูป
       const summaryHtml = '<div class="muted small" style="margin:0 0 8px">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + (a.merged ? ' รายการสายทาง' : ' สายทาง') + '</div>';
-      const qtyTxt = a.merged ? a.qtyParts.map(function (q) { return RE.fmtQty(q.qty) + ' ' + esc(q.unit); }).join(' + ') : RE.fmtQty(a.qty) + ' ' + esc(unitOf(a.code));
-      const ucTxt = a.merged ? (a.sameUnit ? RE.fmt(a.unitCost) + ' บาท/' + esc(a.qtyParts[0].unit) : '- (หน่วยนับต่างกัน)') : RE.fmt(a.unitCost) + ' บาท/' + esc(unitOf(a.code));
+      const qtyTxt = a.qtyParts.map(function (q) { return RE.fmtQty(q.qty) + ' ' + esc(q.unit); }).join(' + ');
+      // หลายหน่วย: Unit Cost คิดแยกตามหน่วย (ค่าใช้จ่ายของไฟล์ในหน่วยนั้น ÷ ปริมาณในหน่วยนั้น)
+      const ucTxt = a.qtyParts.map(function (q) { return RE.fmt(q.unitCost) + ' บาท/' + esc(q.unit); }).join(' · ');
       // รูปที่อยู่ในสไลด์รายรหัสย่อยเดิม — ดึงมาใช้ในสไลด์รวมได้
       const subPh = a.merged ? a.subs.reduce(function (s, c) { return s.concat(photosOf('work:' + c)); }, []) : [];
       h += '<div class="card" id="w-' + a.code + '"><div class="card-head"><h3>รหัส ' + a.code + ' ' + esc(a.name) + (a.merged ? ' <span class="pill info">รวม ' + a.subs.join(', ') + '</span>' : '') + '</h3><div class="sp"></div>' +
         (ex[a.code] ? '<span class="pill info">ไม่ใส่ในไฟล์</span>' : '') +
         '<label class="small"><input type="checkbox" data-excl="' + a.code + '"' + (ex[a.code] ? ' checked' : '') + '> ไม่ใส่สไลด์นี้</label></div>' +
         '<div class="work"><div data-prev="' + a.code + '">' + slideHtml(spec) + '</div><div>' +
-        unitHtml +
+        unitHtml + recUnitsHtml(a) +
         '<div class="kv" style="margin:12px 0"><div>ปริมาณรวม</div><div>' + qtyTxt + '</div><div>ค่าใช้จ่ายรวม</div><div><b>' + RE.fmt(a.total) + '</b> บาท</div>' +
         '<div>Unit Cost</div><div>' + ucTxt + '</div></div>' +
         (subPh.length && n < RE.MAX_PHOTOS ? '<button class="btn btn-sm" style="margin-bottom:8px" data-pullsub="' + a.code + '">ดึงรูปจากสไลด์รายรหัสย่อย (' + subPh.length + ' รูป)</button>' : '') +
@@ -772,7 +805,7 @@
         const code = b.getAttribute('data-pmgr');
         const a = shown.find(function (x) { return x.code === code; });
         openPhotoMgr('work:' + code, 'จัดการรูป · รหัส ' + code + (a ? ' ' + a.name : ''), function () {
-          const cur = slideAggs(RE.aggregate(monthRecords())).find(function (x) { return x.code === code; });
+          const cur = slideAggs(aggr(monthRecords())).find(function (x) { return x.code === code; });
           return cur ? workSpec(cur).layout : { name: '' };
         });
       };
@@ -806,6 +839,24 @@
         const u = Object.assign({}, rep().units || {});
         u[inp.getAttribute('data-unit')] = inp.value.trim();
         run(function () { return saveReport({ units: u }); });
+      };
+    });
+    // หน่วยนับรายไฟล์ (เก็บเป็นค่าเสมอ เพื่อให้เขียนทับแบบ merge ได้)
+    $$('[data-recunit]', p).forEach(function (inp) {
+      inp.onchange = function () {
+        const ru = Object.assign({}, rep().recUnits || {});
+        ru[inp.getAttribute('data-recunit')] = inp.value.trim();
+        run(function () { return saveReport({ recUnits: ru }); });
+      };
+    });
+    $$('[data-allunit]', p).forEach(function (sel) {
+      sel.onchange = function () {
+        if (!sel.value) return;
+        const a = shown.find(function (x) { return x.code === sel.getAttribute('data-allunit'); });
+        if (!a) return;
+        const ru = Object.assign({}, rep().recUnits || {});
+        a.records.forEach(function (r) { if (unitChoices(r.code).indexOf(sel.value) >= 0) ru[r.__id] = sel.value; });
+        run(function () { return saveReport({ recUnits: ru }); }, 'ตั้งหน่วยนับทุกไฟล์แล้ว');
       };
     });
   }
@@ -846,8 +897,8 @@
     const p = $('[data-panel="cover"]');
     const r = rep();
     let h = '<div class="card"><div class="card-head"><h2>หน้าปก</h2></div><div class="work"><div id="coverPrev"></div><div>' +
-      '<label class="f">ข้อความบรรทัดล่าง</label><input type="text" id="meetingText" placeholder="การประชุมประจำเดือน ' + esc(RE.mkLabel(RE.nextMk(S.mk))) + '" value="' + esc(r.meetingText || '') + '">' +
-      '<label class="f" style="margin-top:10px">ข้อความบรรทัดบน</label><input type="text" id="orgText" placeholder="แขวงทางหลวงระยอง" value="' + esc(r.orgText || '') + '">' +
+      '<label class="f">ข้อความบรรทัดบน</label><input type="text" id="orgText" placeholder="แขวงทางหลวงระยอง" value="' + esc(r.orgText || '') + '">' +
+      '<label class="f" style="margin-top:10px">ข้อความบรรทัดล่าง</label><input type="text" id="meetingText" placeholder="การประชุมประจำเดือน ' + esc(RE.mkLabel(RE.nextMk(S.mk))) + '" value="' + esc(r.meetingText || '') + '">' +
       '<label class="f" style="margin-top:14px">รูปหน้าปก (ใช้รูปแนวนอน)</label>' +
       '<button class="btn btn-pmgr" data-pmgr-cover="1" title="เปลี่ยนรูปปก และเลือกจุดกึ่งกลางของรูป">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน</button>' +
       '</div></div></div>';
@@ -858,17 +909,17 @@
     if (!probs.length) h += '<div class="empty small">เดือนนี้ยังไม่มีเรื่องปัญหาอุปสรรค (ถ้าไม่มี จะไม่มีสไลด์หน้านี้ในไฟล์)</div>';
     probs.forEach(function (pr, pi) {
       const t = RE.problemTitles(pr);
-      h += '<div class="prob" data-pid="' + pr.id + '"><div class="row" style="margin-bottom:10px"><h3 style="flex:1">เรื่องที่ ' + (pi + 1) + ': ' + esc(t[0]) + '</h3>' +
+      h += '<div class="prob" data-pid="' + pr.id + '"><div class="prob-h"><h3>เรื่องที่' + (pi + 1) + ': ' + esc(t[0]) + '</h3>' +
         '<button class="btn btn-sm btn-danger" data-delprob="' + pr.id + '">ลบเรื่องนี้</button></div>' +
-        '<div class="fgrid"><div><label class="f">ประเภท</label><select data-pf="kind">' + RE.PROBLEM_KINDS.map(function (k) { return '<option' + (k === pr.kind ? ' selected' : '') + '>' + k + '</option>'; }).join('') + '</select></div>' +
-        '<div class="w2"><label class="f">สายทาง</label><select data-pf="routeSel">' + routeOptions(pr.route ? pr.route + '|' + (pr.ctrl || '') : '') + '</select></div>' +
-        '<div class="w2"><label class="f">ชื่อตอน (เติมให้อัตโนมัติ แก้ได้)</label><input type="text" data-pf="section" value="' + esc(pr.section || '') + '"></div>' +
-        '<div class="w2" style="grid-column:1/-1"><label class="f">หัวเรื่อง (เว้นว่าง = ใช้ตามประเภท)</label><input type="text" data-pf="title" placeholder="' + esc(RE.problemTitles(Object.assign({}, pr, { title: '' }))[0]) + '" value="' + esc(pr.title || '') + '"></div></div>';
+        '<div class="pf-head"><div><label class="f">ประเภท</label><select data-pf="kind">' + RE.PROBLEM_KINDS.map(function (k) { return '<option' + (k === pr.kind ? ' selected' : '') + '>' + k + '</option>'; }).join('') + '</select></div>' +
+        '<div><label class="f">สายทาง</label><select data-pf="routeSel">' + routeOptions(pr.route ? pr.route + '|' + (pr.ctrl || '') : '') + '</select></div>' +
+        '<div><label class="f">ชื่อตอน (อัตโนมัติ แก้ได้)</label><input type="text" data-pf="section" value="' + esc(pr.section || '') + '"></div>' +
+        '<div><label class="f">หัวเรื่อง (ว่าง = ตามประเภท)</label><input type="text" data-pf="title" placeholder="' + esc(RE.problemTitles(Object.assign({}, pr, { title: '' }))[0]) + '" value="' + esc(pr.title || '') + '"></div></div>';
       (pr.points || []).forEach(function (pt, k) {
         const slot = 'prob:' + pr.id + ':' + pt.id;
         const n = photosOf(slot).length;
-        h += '<div class="pt" data-ptid="' + pt.id + '"><div class="row"><b style="flex:1">จุดที่ ' + (k + 1) + '</b><button class="btn btn-icon btn-danger" data-delpt="' + pt.id + '">ลบจุดนี้</button></div>' +
-          '<div class="fgrid" style="margin-top:6px">' +
+        h += '<div class="pt" data-ptid="' + pt.id + '"><div class="pf-pt">' +
+          '<span class="pt-no" title="จุดที่ ' + (k + 1) + '">' + (k + 1) + '</span>' +
           '<div><label class="f">กม.</label><input type="text" data-tf="km" placeholder="14+100" value="' + esc(pt.km || '') + '"></div>' +
           '<div><label class="f">ตำแหน่ง</label><select data-tf="side">' + ['ด้านซ้ายทาง', 'ด้านขวาทาง', 'ทั้งสองด้าน', 'กลางทาง', ''].map(function (s) { return '<option value="' + s + '"' + (s === (pt.side || '') ? ' selected' : '') + '>' + (s || '— ไม่ระบุ —') + '</option>'; }).join('') + '</select></div>' +
           '<div><label class="f">สิ่งที่เสียหาย</label><input type="text" list="objList" data-tf="object" placeholder="ไหล่ทาง" value="' + esc(pt.object || '') + '"></div>' +
@@ -876,11 +927,12 @@
           '<div><label class="f">ความยาว (ม.)</label><input type="number" step="0.01" min="0" data-tf="length" value="' + esc(pt.length == null ? '' : pt.length) + '"></div>' +
           '<div><label class="f">ความกว้าง (ม.)</label><input type="number" step="0.01" min="0" data-tf="width" value="' + esc(pt.width == null ? '' : pt.width) + '"></div>' +
           '<div><label class="f">ความลึก (ม.)</label><input type="number" step="0.01" min="0" data-tf="depth" value="' + esc(pt.depth == null ? '' : pt.depth) + '"></div>' +
-          '<div class="w2"><label class="f">หมายเหตุเพิ่มเติม</label><input type="text" data-tf="extra" value="' + esc(pt.extra || '') + '"></div></div>' +
-          '<div style="margin-top:10px"><button class="btn btn-pmgr" data-pmgr-pt="' + slot + '" data-ptno="' + (k + 1) + '" title="เพิ่ม/ลบ/เรียงลำดับรูป เลือกจุดกึ่งกลาง และแบบจัดวาง">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน' + (n ? ' (' + n + ' รูป)' : '') + '</button> <span class="small muted">แนะนำ 2 รูป: ภาพรวม + ภาพระยะใกล้</span></div></div>';
+          '<button class="btn btn-icon btn-danger pt-del" data-delpt="' + pt.id + '" title="ลบจุดนี้" aria-label="ลบจุดนี้">✕</button></div>' +
+          '<div class="pf-pt2"><div class="pf-extra"><label class="f">หมายเหตุเพิ่มเติม</label><input type="text" data-tf="extra" value="' + esc(pt.extra || '') + '"></div>' +
+          '<button class="btn btn-pmgr" data-pmgr-pt="' + slot + '" data-ptno="' + (k + 1) + '" title="เพิ่ม/ลบ/เรียงลำดับรูป เลือกจุดกึ่งกลาง และแบบจัดวาง (แนะนำ 2 รูป: ภาพรวม + ภาพระยะใกล้)">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน' + (n ? ' (' + n + ' รูป)' : '') + '</button></div></div>';
       });
-      h += '<div style="margin-top:12px"><button class="btn btn-sm" data-addpt="' + pr.id + '">+ เพิ่มจุดความเสียหาย</button></div>' +
-        '<div class="grid2" style="margin-top:14px" data-probprev="' + pr.id + '"></div></div>';
+      h += '<div class="prob-foot"><button class="btn btn-sm" data-addpt="' + pr.id + '">+ เพิ่มจุดความเสียหาย</button><span class="small muted">แนะนำแนบ 2 รูปต่อจุด: ภาพรวม + ภาพระยะใกล้</span></div>' +
+        '<details class="prev"><summary>ดูตัวอย่างสไลด์</summary><div class="grid2" data-probprev="' + pr.id + '"></div></details></div>';
     });
     h += '<datalist id="objList"><option>ไหล่ทาง</option><option>ผิวจราจร</option><option>ลาดคันทาง</option><option>สะพาน</option><option>คอสะพาน</option><option>ท่อลอดเหลี่ยม</option><option>ท่อกลม</option><option>รางระบายน้ำ</option><option>ราวกันอันตราย</option><option>เกาะกลาง</option><option>ทางเท้า</option></datalist>' +
       '<datalist id="dmgList"><option>ถูกน้ำกัดเซาะ</option><option>ทรุดตัว</option><option>ดินสไลด์</option><option>น้ำท่วมขัง</option><option>พังเสียหาย</option><option>แตกร้าว</option><option>ต้นไม้ล้มทับ</option></datalist></div>';
@@ -1128,7 +1180,7 @@
      ====================================================================== */
   function buildSpecs() {
     const r = rep();
-    const aggs = RE.aggregate(monthRecords());
+    const aggs = aggr(monthRecords());
     const fy = RE.fyOf(S.mk);
     const plan = planOf(fy);
     const cum = RE.cumulative(plan || {}, S.records, S.mk);
@@ -1152,7 +1204,7 @@
     const p = $('[data-panel="export"]');
     const r = rep();
     const recs = monthRecords();
-    const aggs = slideAggs(RE.aggregate(recs)).filter(function (a) { return !(r.exclude || {})[a.code]; });
+    const aggs = slideAggs(aggr(recs)).filter(function (a) { return !(r.exclude || {})[a.code]; });
     const noPhoto = aggs.filter(function (a) { return !photosOf('work:' + a.code).length; });
     const fy = RE.fyOf(S.mk);
     const plan = planOf(fy);
