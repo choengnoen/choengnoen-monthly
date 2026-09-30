@@ -648,13 +648,18 @@
   let photoMgr = null;   // { slot, lay: () => layout, bg }
   function photoMgrHtml() {
     const slot = photoMgr.slot, n = photosOf(slot).length;
+    if (slot === 'cover') return '<div class="drop small" data-pdrop="cover"><b>เปลี่ยนรูปปก</b> — ลากรูปมาวาง หรือคลิกเลือก (ใช้รูปแนวนอน)</div>' + thumbsHtml(slot);
     return '<div class="drop small" data-pdrop="' + esc(slot) + '"><b>+ เพิ่มรูป</b> ลากมาวาง หรือคลิกเลือก<br><span class="muted">ตอนนี้ ' + n + '/' + RE.MAX_PHOTOS + ' รูป · แนะนำ 4 รูป</span></div>' +
       thumbsHtml(slot) + layoutSelectHtml(slot, n, photoMgr.lay());
   }
   function bindPhotoMgr(root) {
     bindThumbs(root);
     bindLayoutSelects(root);
-    $$('[data-pdrop]', root).forEach(function (d) { bindDrop(d, 'image/*', true, function (files) { addPhotos(files, d.getAttribute('data-pdrop')); }); });
+    $$('[data-pdrop]', root).forEach(function (d) {
+      const s = d.getAttribute('data-pdrop');
+      if (s === 'cover') bindDrop(d, 'image/*', false, function (files) { addPhotos(files, 'cover', { single: true }); });
+      else bindDrop(d, 'image/*', true, function (files) { addPhotos(files, s); });
+    });
   }
   function openPhotoMgr(slot, title, lay) {
     photoMgr = { slot: slot, lay: lay, bg: null };
@@ -810,53 +815,6 @@
     const c = photosOf('cover')[0];
     return RE.slideCover({ mk: S.mk, meetingText: rep().meetingText, orgText: rep().orgText, cover: c ? photoSpec(c) : null, logo: settings().logo });
   }
-  // ตรากรมทางหลวง: ย่อให้ไม่เกิน 600 px วางกลางผืนสี่เหลี่ยมจัตุรัสพื้นโปร่งใส (กรอบบนปกเป็นจัตุรัส รูปไม่ถูกยืด)
-  // เก็บเป็น PNG (คงพื้นโปร่งใส) — ถ้าใหญ่เกินที่เอกสาร Firestore รับได้ (~1 MB) ย่อลงอีก
-  function logoDataUrl(file) {
-    return new Promise(function (res, rej) {
-      const url = URL.createObjectURL(file);
-      const im = new Image();
-      im.onload = function () {
-        URL.revokeObjectURL(url);
-        let side = Math.min(600, Math.max(im.naturalWidth, im.naturalHeight));
-        for (let i = 0; i < 5; i++) {
-          const c = document.createElement('canvas');
-          c.width = c.height = side;
-          const k = side / Math.max(im.naturalWidth, im.naturalHeight);
-          const w = im.naturalWidth * k, h = im.naturalHeight * k;
-          c.getContext('2d').drawImage(im, (side - w) / 2, (side - h) / 2, w, h);
-          const d = c.toDataURL('image/png');
-          if (d.length < 700000) { res(d); return; }
-          side = Math.round(side * 0.75);
-        }
-        rej(new Error('ไฟล์ตรามีรายละเอียดมากเกินไป — ลองใช้ไฟล์ PNG/JPG ที่เล็กลง'));
-      };
-      im.onerror = function () { URL.revokeObjectURL(url); rej(new Error('เปิดไฟล์รูปนี้ไม่ได้ — ใช้ไฟล์ PNG หรือ JPG')); };
-      im.src = url;
-    });
-  }
-  // ช่องตรากรมทางหลวง (หน้า ③) — เปลี่ยนได้เฉพาะเจ้าของระบบ/ผู้ดูแลระบบ (กฎ config/settings)
-  function logoHtml() {
-    const st = settings();
-    const img = '<img src="' + esc(st.logo || 'assets/cover-logo.png') + '" alt="ตรากรมทางหลวง" style="width:64px;height:64px;object-fit:contain;flex:none">';
-    const info = st.logo
-      ? 'ใช้ตราที่อัปโหลด' + (st.logoName ? ' (' + esc(st.logoName) + ')' : '') + (st.logoBy ? '<br>โดย ' + esc(st.logoBy) : '')
-      : 'ใช้ตราเดิม (จากรายงานเดือน มิ.ย. 69)';
-    let h = '<label class="f" style="margin-top:14px">ตรากรมทางหลวง (หน้าปก + มุมซ้ายบนทุกสไลด์ ใช้ทุกเดือน)</label>' +
-      '<div class="row" style="align-items:center;gap:10px;flex-wrap:nowrap">' + img + '<div class="small muted">' + info + '</div></div>';
-    if (!FBL.isPrivileged()) return h + '<p class="small muted">เปลี่ยนตราได้เฉพาะเจ้าของระบบหรือผู้ดูแลระบบ</p>';
-    h += '<div class="drop small" id="logoDrop" style="margin-top:8px"><b>อัปโหลดตรากรมทางหลวง</b> — ลากไฟล์มาวาง หรือคลิกเลือก (แนะนำ PNG พื้นโปร่งใส)</div>';
-    if (st.logo) h += '<button class="btn btn-sm" id="logoReset">ใช้ตราเดิม</button>';
-    return h;
-  }
-  function uploadLogo(files) {
-    const f = files.filter(function (x) { return /^image\//.test(x.type); })[0];
-    if (!f) { toast('เลือกไฟล์รูปภาพ (PNG หรือ JPG)', 'err'); return; }
-    run(async function () {
-      const d = await logoDataUrl(f);
-      await FBL.set('config', 'settings', { logo: d, logoName: f.name, logoAt: FBL.nowIso(), logoBy: FBL.user.name }, true);
-    }, 'บันทึกตรากรมทางหลวงแล้ว — ใช้กับทุกสไลด์ทุกเดือน');
-  }
   function problemSpecs(pr) {
     const pts = pr.points || [];
     const pages = Math.max(1, Math.ceil(pts.length / 3));
@@ -888,8 +846,9 @@
     let h = '<div class="card"><div class="card-head"><h2>หน้าปก</h2></div><div class="work"><div id="coverPrev"></div><div>' +
       '<label class="f">ข้อความบรรทัดล่าง</label><input type="text" id="meetingText" placeholder="การประชุมประจำเดือน ' + esc(RE.mkLabel(RE.nextMk(S.mk))) + '" value="' + esc(r.meetingText || '') + '">' +
       '<label class="f" style="margin-top:10px">ข้อความบรรทัดบน</label><input type="text" id="orgText" placeholder="แขวงทางหลวงระยอง" value="' + esc(r.orgText || '') + '">' +
-      '<label class="f" style="margin-top:14px">รูปหน้าปก</label><div class="drop small" data-pdrop-cover="1"><b>เปลี่ยนรูปปก</b> — ลากรูปมาวาง หรือคลิกเลือก (ใช้รูปแนวนอน)</div>' +
-      (photosOf('cover').length ? thumbsHtml('cover') + '<button class="btn btn-sm" id="coverReset">ใช้รูปปกเริ่มต้น</button>' : '<p class="small muted">ตอนนี้ใช้รูปปกเริ่มต้น (ภาพถนนจากรายงานเดิม)</p>') +
+      '<label class="f" style="margin-top:14px">รูปหน้าปก (ใช้รูปแนวนอน)</label>' +
+      '<button class="btn btn-pmgr" data-pmgr-cover="1" title="เปลี่ยนรูปปก และเลือกจุดกึ่งกลางของรูป">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน</button>' +
+      (photosOf('cover').length ? ' <button class="btn btn-sm" id="coverReset">ใช้รูปปกเริ่มต้น</button>' : '<p class="small muted">ตอนนี้ใช้รูปปกเริ่มต้น (ภาพถนนจากรายงานเดิม)</p>') +
       logoHtml() + '</div></div></div>';
 
     h += '<div class="card"><div class="card-head"><h2>ปัญหา อุปสรรค</h2><div class="sp"></div><button class="btn btn-primary" id="addProb">+ เพิ่มเรื่องปัญหา/ความเสียหาย</button></div>' +
@@ -917,7 +876,7 @@
           '<div><label class="f">ความกว้าง (ม.)</label><input type="number" step="0.01" min="0" data-tf="width" value="' + esc(pt.width == null ? '' : pt.width) + '"></div>' +
           '<div><label class="f">ความลึก (ม.)</label><input type="number" step="0.01" min="0" data-tf="depth" value="' + esc(pt.depth == null ? '' : pt.depth) + '"></div>' +
           '<div class="w2"><label class="f">หมายเหตุเพิ่มเติม</label><input type="text" data-tf="extra" value="' + esc(pt.extra || '') + '"></div></div>' +
-          '<div class="drop small" style="margin-top:8px" data-pdrop="' + slot + '"><b>+ รูปของจุดนี้</b> (แนะนำ 2 รูป: ภาพรวม + ภาพระยะใกล้)</div>' + thumbsHtml(slot) + layoutSelectHtml(slot, n, { name: '' }) + '</div>';
+          '<div style="margin-top:10px"><button class="btn btn-pmgr" data-pmgr-pt="' + slot + '" data-ptno="' + (k + 1) + '" title="เพิ่ม/ลบ/เรียงลำดับรูป เลือกจุดกึ่งกลาง และแบบจัดวาง">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน' + (n ? ' (' + n + ' รูป)' : '') + '</button> <span class="small muted">แนะนำ 2 รูป: ภาพรวม + ภาพระยะใกล้</span></div></div>';
       });
       h += '<div style="margin-top:12px"><button class="btn btn-sm" data-addpt="' + pr.id + '">+ เพิ่มจุดความเสียหาย</button></div>' +
         '<div class="grid2" style="margin-top:14px" data-probprev="' + pr.id + '"></div></div>';
@@ -931,17 +890,12 @@
     const saveCoverText = debounce(function () { run(function () { return saveReport({ meetingText: $('#meetingText').value.trim(), orgText: $('#orgText').value.trim() }); }); }, 700);
     $('#meetingText').oninput = function () { liveCover(); saveCoverText(); };
     $('#orgText').oninput = function () { liveCover(); saveCoverText(); };
-    bindDrop($('[data-pdrop-cover]', p), 'image/*', false, function (files) { addPhotos(files, 'cover', { single: true }); });
-    if ($('#coverReset')) $('#coverReset').onclick = function () { run(function () { return FBL.deletePhotos(photosOf('cover').map(function (x) { return x.__id; })); }); };
-    if ($('#logoDrop')) bindDrop($('#logoDrop'), 'image/*', false, uploadLogo);
-    if ($('#logoReset')) $('#logoReset').onclick = async function () {
-      if (await confirmBox('กลับไปใช้ตรากรมทางหลวงเดิม?', '<p>ตราที่อัปโหลดไว้จะถูกลบ มีผลกับหน้าปกทุกเดือน</p>', 'ใช้ตราเดิม'))
-        run(function () { return FBL.set('config', 'settings', { logo: '', logoName: '', logoAt: FBL.nowIso(), logoBy: FBL.user.name }, true); }, 'กลับไปใช้ตราเดิมแล้ว');
-    };
-    $$('[data-pdrop]', p).forEach(function (d) { bindDrop(d, 'image/*', true, function (files) { addPhotos(files, d.getAttribute('data-pdrop')); }); });
-    bindThumbs(p);
-    bindLayoutSelects(p);
-
+    $('[data-pmgr-cover]', p).onclick = function () { openPhotoMgr('cover', 'จัดการรูปหน้าปก', function () { return { name: '' }; }); };
+    $$('[data-pmgr-pt]', p).forEach(function (b) {
+      b.onclick = function () {
+        openPhotoMgr(b.getAttribute('data-pmgr-pt'), 'จัดการรูป · จุดที่ ' + b.getAttribute('data-ptno'), function () { return { name: '' }; });
+      };
+    });
     $('#addProb').onclick = function () {
       const list = problems().slice();
       list.push({ id: FBL.randomId(8), kind: 'อุทกภัย', route: '', ctrl: '', section: '', title: '', points: [{ id: FBL.randomId(6), side: 'ด้านขวาทาง', damage: 'ถูกน้ำกัดเซาะ' }] });
