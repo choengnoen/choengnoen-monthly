@@ -707,10 +707,10 @@
       const n = photosOf(slot).length;
       const unitHtml = a.merged
         ? '<div class="unit-grid">' + a.subs.map(function (c) { return '<div class="unit-item"><b class="small">' + c + '</b>' + unitFieldHtml(c) + '</div>'; }).join('') + '</div>' +
-          a.subs.map(unitNoteHtml).join('') +
-          '<div class="muted small">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + ' รายการสายทาง</div>'
-        : '<div class="row"><div style="width:130px"><label class="f">หน่วยนับ</label>' + unitFieldHtml(a.code) + '</div>' +
-          '<div class="muted small" style="flex:1">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + ' สายทาง</div></div>' + unitNoteHtml(a.code);
+          a.subs.map(unitNoteHtml).join('')
+        : '<div class="row"><div style="width:130px"><label class="f">หน่วยนับ</label>' + unitFieldHtml(a.code) + '</div></div>' + unitNoteHtml(a.code);
+      // สรุปจำนวนไฟล์/วันทำงาน/สายทาง — แสดงเหนือกล่อง + เพิ่มรูป
+      const summaryHtml = '<div class="muted small" style="margin:0 0 8px">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + (a.merged ? ' รายการสายทาง' : ' สายทาง') + '</div>';
       const qtyTxt = a.merged ? a.qtyParts.map(function (q) { return RE.fmtQty(q.qty) + ' ' + esc(q.unit); }).join(' + ') : RE.fmtQty(a.qty) + ' ' + esc(unitOf(a.code));
       const ucTxt = a.merged ? (a.sameUnit ? RE.fmt(a.unitCost) + ' บาท/' + esc(a.qtyParts[0].unit) : '- (หน่วยนับต่างกัน)') : RE.fmt(a.unitCost) + ' บาท/' + esc(unitOf(a.code));
       // รูปที่อยู่ในสไลด์รายรหัสย่อยเดิม — ดึงมาใช้ในสไลด์รวมได้
@@ -723,6 +723,7 @@
         '<div class="kv" style="margin:12px 0"><div>ปริมาณรวม</div><div>' + qtyTxt + '</div><div>ค่าใช้จ่ายรวม</div><div><b>' + RE.fmt(a.total) + '</b> บาท</div>' +
         '<div>Unit Cost</div><div>' + ucTxt + '</div></div>' +
         (subPh.length && n < RE.MAX_PHOTOS ? '<button class="btn btn-sm" style="margin-bottom:8px" data-pullsub="' + a.code + '">ดึงรูปจากสไลด์รายรหัสย่อย (' + subPh.length + ' รูป)</button>' : '') +
+        summaryHtml +
         '<div class="drop small" data-pdrop="' + slot + '"><b>+ เพิ่มรูป</b> ลากมาวาง หรือคลิกเลือก<br><span class="muted">ตอนนี้ ' + n + '/' + RE.MAX_PHOTOS + ' รูป · แนะนำ 4 รูป</span></div>' +
         thumbsHtml(slot) + layoutSelectHtml(slot, n, spec.layout) + '</div></div></div>';
     });
