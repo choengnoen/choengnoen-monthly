@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const S = { reports: [], records: [], photos: [], plans: [], config: [], mk:'', tab: 'import', pending: null, probDraft: null, exporting: false };
+  const S = { reports: [], records: [], photos: [], plans: [], config: [], trash: { records: [], photos: [] }, mk:'', tab: 'import', pending: null, probDraft: null, exporting: false };
   const $ = function (sel, root) { return (root || document).querySelector(sel); };
   const $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -46,6 +46,13 @@
   }
 
   /* ---------------- ข้อมูลที่ใช้บ่อย ---------------- */
+  // records/photos ที่ถูกลบแบบซ่อน (มี deletedAt) แยกไปถังขยะ — ส่วนอื่นของหน้าเว็บไม่เห็นรายการเหล่านี้
+  function setCol(col, docs) {
+    if (col === 'records' || col === 'photos') {
+      S[col] = docs.filter(function (d) { return !d.deletedAt; });
+      S.trash[col] = docs.filter(function (d) { return d.deletedAt; });
+    } else S[col] = docs;
+  }
   function rep() { return S.reports.find(function (r) { return r.__id === S.mk; }) || {}; }
   function monthRecords() { return S.records.filter(function (r) { return r.mk === S.mk; }); }
   function photosOf(slot) {
@@ -274,10 +281,10 @@
     const my = ++session;
     // โหลดข้อมูลให้เสร็จก่อนค่อยสลับหน้า — ไม่ให้เห็นหน้าระบบว่าง ๆ แล้วค่อยกระโดดเป็นข้อมูล
     loginWait('กำลังโหลดข้อมูล…');
-    const onChange = function (col, docs) { S[col] = docs; if (col === 'photos') S.photos.forEach(function (p) { p.id = p.__id; }); scheduleRender(col); if (col === 'photos' || col === 'reports') refreshPhotoMgr(); };
+    const onChange = function (col, docs) { setCol(col, docs); if (col === 'photos') S.photos.forEach(function (p) { p.id = p.__id; }); scheduleRender(col); if (col === 'photos' || col === 'reports') refreshPhotoMgr(); };
     const got = await Promise.all(['reports', 'records', 'photos', 'plans', 'config'].map(function (c) { return FBL.watch(c, onChange); }));
     if (my !== session || !FBL.user) return;   // ออกจากระบบไประหว่างโหลด
-    S.reports = got[0]; S.records = got[1]; S.photos = got[2]; S.plans = got[3]; S.config = got[4];
+    setCol('reports', got[0]); setCol('records', got[1]); setCol('photos', got[2]); setCol('plans', got[3]); setCol('config', got[4]);
     S.photos.forEach(function (p) { p.id = p.__id; });
     const last = lsGet('cn-monthly-mk');
     const ids = S.reports.map(function (r) { return r.__id; }).sort();
@@ -365,7 +372,7 @@
     renderAll();
     // ล้างรูปของเดือนก่อน (รูปต้นฉบับเจ้าหน้าที่เก็บไว้แล้ว)
     const old = S.photos.filter(function (p) { return p.mk !== mk; });
-    if (old.length) {
+    if (old.length && FBL.isPrivileged()) {
       const months = Array.from(new Set(old.map(function (p) { return p.mk; }))).map(RE.mkLabel).join(', ');
       const ok = await confirmBox('ล้างรูปของเดือนก่อน?', '<p>ในระบบยังมีรูปของเดือน <b>' + esc(months) + '</b> อยู่ <b>' + old.length + ' รูป</b></p><p>เริ่มเดือนใหม่แล้ว แนะนำให้ลบรูปเดือนก่อนออกเพื่อประหยัดพื้นที่ (รูปต้นฉบับยังอยู่ในโฟลเดอร์ของเจ้าหน้าที่)</p><p class="small muted">ตัวเลขผลงานของเดือนก่อนไม่ถูกลบ</p>', 'ลบรูปเดือนก่อน', true);
       if (ok) await run(function () { return FBL.deletePhotos(old.map(function (p) { return p.__id; })); }, 'ลบรูปเดือนก่อนแล้ว ' + old.length + ' รูป');
@@ -443,8 +450,8 @@
   async function deleteRecord(id) {
     const r = S.records.find(function (x) { return x.__id === id; });
     if (!r) return;
-    if (await confirmBox('ยืนยันการลบ?', '<p>' + esc(r.file) + ' — รหัส ' + esc(r.code) + ' ทล.' + esc(r.route) + ' (' + RE.fmt(r.total) + ' บาท)</p><p class="small muted">ถ้าลบแล้ว สามารถนำเข้าไฟล์เดิมใหม่ได้ภายหลัง</p>', 'ลบ', true))
-      run(function () { return FBL.del('records', id); }, 'ลบแล้ว');
+    if (await confirmBox('ยืนยันการลบ?', '<p>' + esc(r.file) + ' — รหัส ' + esc(r.code) + ' ทล.' + esc(r.route) + ' (' + RE.fmt(r.total) + ' บาท)</p><p class="small muted">รายการจะย้ายไปถังขยะ — เจ้าของ/ผู้ดูแลระบบตรวจก่อนลบจริง (กู้คืนได้)</p>', 'ลบ', true))
+      run(function () { return FBL.setDeleted('records', [id], true); }, 'ย้ายไปถังขยะแล้ว');
   }
 
   function pendingHtml() {
@@ -582,7 +589,7 @@
           takenAt: r.takenAt, flags: r.quality.flags, name: done[i].file.name, size: r.size, by: FBL.user.name, at: FBL.nowIso()
         }, r.bytes);
       }
-      if (opts.single && existing.length) await FBL.deletePhotos(existing.map(function (p) { return p.__id; }));
+      if (opts.single && existing.length) await FBL.setDeleted('photos', existing.map(function (p) { return p.__id; }), true);   // รูปเดิมเข้าถังขยะ (เจ้าของ/ผู้ดูแลลบจริงทีหลัง)
       const flagged = done.filter(function (d) { return d.r.quality.flags.length; });
       toast('เพิ่มรูปแล้ว ' + done.length + ' รูป' + (flagged.length ? ' — มี ' + flagged.length + ' รูปที่อาจมืด/เบลอ ลองตรวจดู' : ''), flagged.length ? '' : 'ok', 5000);
     } catch (e) { console.error(e); toast(e.message || String(e), 'err'); }
@@ -621,8 +628,8 @@
     });
     $$('[data-rm]', root).forEach(function (b) {
       b.onclick = async function () {
-        if (await confirmBox('ลบรูปนี้?', '<p>ลบออกจากรายงาน (รูปต้นฉบับในเครื่องเจ้าหน้าที่ไม่ได้รับผลกระทบ)</p>', 'ลบรูป', true))
-          run(function () { return FBL.deletePhotos([b.getAttribute('data-rm')]); });
+        if (await confirmBox('ลบรูปนี้?', '<p>ลบออกจากรายงาน (ย้ายไปถังขยะ — เจ้าของ/ผู้ดูแลตรวจก่อนลบจริง · รูปต้นฉบับในเครื่องเจ้าหน้าที่ไม่ได้รับผลกระทบ)</p>', 'ลบรูป', true))
+          run(function () { return FBL.setDeleted('photos', [b.getAttribute('data-rm')], true); });
       };
     });
   }
@@ -930,7 +937,7 @@
         const pid = b.getAttribute('data-delprob');
         if (!await confirmBox('ลบเรื่องปัญหานี้?', '<p>รวมถึงรูปทั้งหมดของเรื่องนี้</p>', 'ลบ', true)) return;
         const ids = S.photos.filter(function (x) { return x.mk === S.mk && String(x.slot).indexOf('prob:' + pid + ':') === 0; }).map(function (x) { return x.__id; });
-        if (ids.length) await run(function () { return FBL.deletePhotos(ids); });
+        if (ids.length) await run(function () { return FBL.setDeleted('photos', ids, true); });
         saveProblems(problems().filter(function (x) { return x.id !== pid; }), true);
       };
     });
@@ -939,7 +946,7 @@
         const pid = b.closest('[data-pid]').getAttribute('data-pid'), ptid = b.getAttribute('data-delpt');
         const ids = photosOf('prob:' + pid + ':' + ptid).map(function (x) { return x.__id; });
         if (ids.length && !await confirmBox('ลบจุดนี้?', '<p>รูปของจุดนี้ ' + ids.length + ' รูปจะถูกลบด้วย</p>', 'ลบ', true)) return;
-        if (ids.length) await run(function () { return FBL.deletePhotos(ids); });
+        if (ids.length) await run(function () { return FBL.setDeleted('photos', ids, true); });
         const list = clone(problems());
         const pr = list.find(function (x) { return x.id === pid; });
         pr.points = pr.points.filter(function (x) { return x.id !== ptid; });
@@ -1190,7 +1197,7 @@
       specs.map(function (s, i) { return '<div><div class="small muted" style="margin-bottom:4px">' + (i + 1) + '. ' + esc(s.title) + '</div>' + slideHtml(s) + '</div>'; }).join('') + '</div></div>' +
       '<div class="card"><div class="card-head"><h2>ล้างรูปของเดือนนี้</h2></div><p>ในระบบมีรูปของเดือนนี้ <b>' + monthPhotos.length + '</b> รูป ' +
       '(ประมาณ ' + RE.fmt(monthPhotos.reduce(function (s, x) { return s + (x.size || 0); }, 0) / 1048576, 1) + ' MB) — เมื่อส่งออกและนำเสนอเรียบร้อยแล้วลบได้ หรือระบบจะถามให้ลบตอนเริ่มเดือนใหม่</p>' +
-      '<button class="btn btn-danger" id="clearPhotos"' + (monthPhotos.length ? '' : ' disabled') + '>ลบรูปทั้งหมดของเดือนนี้</button></div>';
+      '<button class="btn btn-danger" id="clearPhotos"' + (monthPhotos.length && FBL.isPrivileged() ? '' : ' disabled') + '>ลบรูปทั้งหมดของเดือนนี้</button>' + (FBL.isPrivileged() ? '' : '<p class="small muted" style="margin-top:8px">ลบรูปได้เฉพาะเจ้าของระบบหรือผู้ดูแลระบบ</p>') + '</div>';
     p.innerHTML = h;
     // เริ่มโหลดรูปจาก Drive เงียบ ๆ ตั้งแต่เปิดแท็บนี้ — พอกดส่งออกรูปส่วนใหญ่จะพร้อมแล้ว
     if (FBL.photoStore === 'drive' && !S.exporting) FBL.prefetchPhotos(photoIdsOf(specs));
@@ -1300,6 +1307,70 @@
   /* ======================================================================
      ตั้งค่า (ทีม / พื้นที่รูป)
      ====================================================================== */
+  /* สมุดชื่อล็อกอิน (แผน 6) — เจ้าของระบบกดย้ายครั้งเดียว
+     หน้าล็อกอินเปิดดูได้โดยไม่ต้องล็อกอิน จึงอ่านได้เฉพาะ "ชื่อ → อีเมลสังเคราะห์" จากสมุดชื่อ (login_directory)
+     หลังย้าย ตารางรายชื่อทีม (มีสถานะเจ้าของ/ผู้ดูแล) จะอ่านได้เฉพาะสมาชิกที่ล็อกอินแล้ว — ระหว่างย้ายไม่มีใครล็อกอินไม่ได้ */
+  async function renderDirNotice() {
+    const box = $('#dirNotice');
+    if (!box || !FBL.user || !FBL.user.isOwner || FBL.demo || !FBL.loginDirStatus) return;
+    let st;
+    try { st = await FBL.loginDirStatus(); } catch (e) { box.innerHTML = ''; return; }
+    if (!$('#dirNotice')) return;
+    const bad = st.missing.length + st.extra.length;
+    if (st.ready && !bad) { box.innerHTML = '<p class="small muted" style="margin-top:12px">🔒 สมุดชื่อล็อกอิน: ย้ายแล้ว — คนที่ยังไม่ล็อกอินมองไม่เห็นว่าใครเป็นเจ้าของ/ผู้ดูแลระบบ</p>'; return; }
+    const why = !st.ready
+      ? 'ยังไม่ได้ย้ายรายชื่อไปสมุดชื่อล็อกอิน — ตอนนี้คนนอกที่เปิดหน้านี้ยังเห็นว่าใครเป็นเจ้าของ/ผู้ดูแลระบบ กดปุ่มด้านล่างครั้งเดียวเพื่อย้าย (ไม่กระทบการล็อกอินของใคร)'
+      : 'สมุดชื่อล็อกอินไม่ตรงกับรายชื่อทีม ' + bad + ' ชื่อ (' + st.missing.concat(st.extra).join(', ') + ') — กดซิงก์เพื่อให้ตรงกัน';
+    box.innerHTML = '<div class="demo-note" style="margin-top:12px">⚠ ' + esc(why) + '<div style="margin-top:8px"><button class="btn btn-primary btn-sm" id="dirMigrate">' + (st.ready ? 'ซิงก์สมุดชื่อล็อกอิน' : 'ย้ายรายชื่อไปสมุดชื่อล็อกอิน') + '</button></div></div>';
+    $('#dirMigrate').onclick = function () {
+      $('#dirMigrate').disabled = true;
+      run(function () { return FBL.migrateLoginDirectory(); }, 'ย้ายสมุดชื่อล็อกอินเรียบร้อยแล้ว').then(renderDirNotice);
+    };
+  }
+
+  // ถังขยะ (ลบแบบซ่อน) — เจ้าหน้าที่ทั่วไปลบแล้วรายการเข้าถังขยะ เจ้าของ/ผู้ดูแลตรวจแล้วกู้คืนหรือลบจริงที่หน้าตั้งค่า
+  function trashCardHtml() {
+    if (!FBL.isPrivileged()) return '';
+    const recs = S.trash.records, phs = S.trash.photos;
+    const who = function (d) { return esc(d.deletedBy || '') + (d.deletedAt ? ' · ' + esc(String(d.deletedAt).slice(0, 10)) : ''); };
+    let h = '<div class="card"><div class="card-head"><h2>ถังขยะ (รอตรวจก่อนลบจริง)</h2></div>';
+    if (!recs.length && !phs.length) return h + '<p class="muted">ว่าง — ที่เจ้าหน้าที่กดลบจะมาอยู่ที่นี่</p></div>';
+    if (recs.length) {
+      h += '<h3 style="margin:8px 0">รายการผลงาน (' + recs.length + ')</h3><table class="tbl"><tr><th>ไฟล์</th><th>รหัส / ทล.</th><th>ลบโดย</th><th></th></tr>' + recs.map(function (r) {
+        return '<tr><td>' + esc(r.file || '') + '</td><td>' + esc(r.code || '') + ' ทล.' + esc(r.route || '') + '</td><td class="small">' + who(r) + '</td><td class="row" style="justify-content:flex-end"><button class="btn btn-sm" data-trs="records:' + esc(r.__id) + '">กู้คืน</button><button class="btn btn-sm btn-danger" data-trd="records:' + esc(r.__id) + '">ลบจริง</button></td></tr>';
+      }).join('') + '</table>';
+    }
+    if (phs.length) {
+      h += '<h3 style="margin:12px 0 8px">รูป (' + phs.length + ')</h3><table class="tbl"><tr><th>รูป</th><th>เดือน</th><th>ลบโดย</th><th></th></tr>' + phs.map(function (p) {
+        return '<tr><td><img src="' + esc(p.thumb || '') + '" style="height:46px;border-radius:4px"></td><td>' + esc(RE.mkLabel(p.mk)) + '</td><td class="small">' + who(p) + '</td><td class="row" style="justify-content:flex-end"><button class="btn btn-sm" data-trs="photos:' + esc(p.__id) + '">กู้คืน</button><button class="btn btn-sm btn-danger" data-trd="photos:' + esc(p.__id) + '">ลบจริง</button></td></tr>';
+      }).join('') + '</table>';
+    }
+    return h + '</div>';
+  }
+  function bindTrash(p) {
+    const find = function (v) { const a = v.split(':'); return { col: a[0], id: a.slice(1).join(':'), item: S.trash[a[0]].find(function (x) { return x.__id === a.slice(1).join(':'); }) }; };
+    $$('[data-trs]', p).forEach(function (b) {
+      b.onclick = async function () {
+        const t = find(b.getAttribute('data-trs')); if (!t.item) return;
+        await run(function () { return FBL.setDeleted(t.col, [t.id], false); }, 'กู้คืนแล้ว');
+        t.item.deletedAt = null; t.item.deletedBy = '';
+        S.trash[t.col] = S.trash[t.col].filter(function (x) { return x !== t.item; });
+        if (!S[t.col].some(function (x) { return x.__id === t.id; })) S[t.col].push(t.item);
+        if (t.col === 'photos') t.item.id = t.item.__id;
+        renderAll(); renderSettings();
+      };
+    });
+    $$('[data-trd]', p).forEach(function (b) {
+      b.onclick = async function () {
+        const t = find(b.getAttribute('data-trd')); if (!t.item) return;
+        if (!await confirmBox('ลบจริง?', '<p>ลบถาวร กู้คืนไม่ได้อีก' + (t.col === 'photos' ? ' (ไฟล์รูปใน Drive ไปอยู่ถังขยะของ Drive 30 วัน)' : '') + '</p>', 'ลบจริง', true)) return;
+        await run(function () { return t.col === 'photos' ? FBL.deletePhotos([t.id]) : FBL.del('records', t.id); }, 'ลบจริงแล้ว');
+        S.trash[t.col] = S.trash[t.col].filter(function (x) { return x !== t.item; });
+        renderSettings();
+      };
+    });
+  }
+
   function renderSettings() {
     const p = $('[data-panel="settings"]');
     const team = FBL.team();
@@ -1311,13 +1382,15 @@
         (own && !FBL.demo ? (t.isOwner ? '' : '<button class="btn btn-sm" data-adm="' + esc(t.name) + '">' + (t.isAdmin ? 'ถอดผู้ดูแล' : 'ตั้งเป็นผู้ดูแล') + '</button>') +
           '<button class="btn btn-sm" data-rpw="' + esc(t.name) + '">ตั้งรหัสผ่านใหม่</button>' + (t.isOwner ? '' : '<button class="btn btn-sm btn-danger" data-rmm="' + esc(t.name) + '">ลบ</button>') : '') + '</td></tr>';
     }).join('') + '</table></div>';
-    if (own && !FBL.demo) h += '<div class="row" style="margin-top:12px"><input type="text" id="nmName" placeholder="ชื่อ-นามสกุล" style="max-width:260px"><input type="password" id="nmPw" placeholder="รหัสผ่านเริ่มต้น (6 ตัวขึ้นไป)" style="max-width:220px"><label class="small"><input type="checkbox" id="nmAdm"> ผู้ดูแลระบบ</label><button class="btn btn-primary" id="nmAdd">+ เพิ่มเจ้าหน้าที่</button></div>';
+    if (own && !FBL.demo) h += '<div class="row" style="margin-top:12px"><input type="text" id="nmName" placeholder="ชื่อ-นามสกุล" style="max-width:260px"><input type="password" id="nmPw" placeholder="รหัสผ่านเริ่มต้น (8 ตัวขึ้นไป)" style="max-width:220px"><label class="small"><input type="checkbox" id="nmAdm"> ผู้ดูแลระบบ</label><button class="btn btn-primary" id="nmAdd">+ เพิ่มเจ้าหน้าที่</button></div>';
+    if (own && !FBL.demo) h += '<div id="dirNotice"></div>';
     h += '</div>';
     const byMonth = {};
     S.photos.forEach(function (x) { const m = byMonth[x.mk] = byMonth[x.mk] || { n: 0, size: 0 }; m.n++; m.size += x.size || 0; });
+    h += trashCardHtml();
     h += '<div class="card"><div class="card-head"><h2>พื้นที่เก็บรูปชั่วคราว</h2></div>' +
       (Object.keys(byMonth).length ? '<table class="tbl" style="max-width:520px"><tr><th>เดือน</th><th class="num">รูป</th><th class="num">ขนาด</th><th></th></tr>' + Object.keys(byMonth).sort().map(function (m) {
-        return '<tr><td>' + esc(RE.mkLabel(m)) + '</td><td class="num">' + byMonth[m].n + '</td><td class="num">' + RE.fmt(byMonth[m].size / 1048576, 1) + ' MB</td><td>' + (m === S.mk ? '<span class="small muted">เดือนปัจจุบัน</span>' : '<button class="btn btn-sm btn-danger" data-clr="' + m + '">ลบ</button>') + '</td></tr>';
+        return '<tr><td>' + esc(RE.mkLabel(m)) + '</td><td class="num">' + byMonth[m].n + '</td><td class="num">' + RE.fmt(byMonth[m].size / 1048576, 1) + ' MB</td><td>' + (m === S.mk ? '<span class="small muted">เดือนปัจจุบัน</span>' : (FBL.isPrivileged() ? '<button class="btn btn-sm btn-danger" data-clr="' + m + '">ลบ</button>' : '')) + '</td></tr>';
       }).join('') + '</table>' : '<p class="muted">ไม่มีรูปในระบบ</p>') +
       (FBL.photoStore === 'drive'
         ? '<p class="small muted">ตัวรูปเก็บใน Google Drive (โฟลเดอร์ "ระบบรายงานประจำเดือน - รูปภาพ" แยกตามเดือน) — ลบแล้วอยู่ในถังขยะของ Drive กู้คืนได้ 30 วัน</p></div>'
@@ -1325,6 +1398,8 @@
     h += '<div class="card"><div class="card-head"><h2>เกี่ยวกับระบบ</h2></div><div class="small">งานรายงานประจำเดือน หมวดทางหลวงเชิงเนิน · รุ่น 1.0 (26 ก.ย. 2569)<br>' +
       'ฐานข้อมูล: ' + (FBL.demo ? '<b>โหมดทดลอง (เก็บในเครื่องนี้)</b>' : 'Firebase Firestore') + ' · ที่เก็บรูป: ' + (FBL.photoStore === 'drive' ? 'Google Drive' : 'Firestore') + ' · สายทางจากฐานข้อมูลกลาง CN-Hub: ' + (window.CNMaster && CNMaster.routes && CNMaster.routes().length ? 'เชื่อมต่อแล้ว (' + CNMaster.routes().length + ' สาย)' : 'ยังไม่เชื่อมต่อ — ใช้ชื่อตอนสำรอง') + '</div></div>';
     p.innerHTML = h;
+    renderDirNotice();
+    bindTrash(p);
     $$('[data-clr]', p).forEach(function (b) {
       b.onclick = async function () {
         const m = b.getAttribute('data-clr');
@@ -1344,7 +1419,7 @@
     });
     $$('[data-rpw]', p).forEach(function (b) {
       b.onclick = async function () {
-        const pw = await modal({ title: 'ตั้งรหัสผ่านใหม่ให้ ' + b.getAttribute('data-rpw'), html: '<input type="password" id="rpw" placeholder="รหัสผ่านใหม่ (6 ตัวขึ้นไป)">', ok: 'บันทึก', read: function (bg) { return $('#rpw', bg).value; } });
+        const pw = await modal({ title: 'ตั้งรหัสผ่านใหม่ให้ ' + b.getAttribute('data-rpw'), html: '<input type="password" id="rpw" placeholder="รหัสผ่านใหม่ (8 ตัวขึ้นไป)">', ok: 'บันทึก', read: function (bg) { return $('#rpw', bg).value; } });
         if (pw) run(function () { return FBL.resetMemberPassword(b.getAttribute('data-rpw'), pw); }, 'ตั้งรหัสผ่านใหม่แล้ว');
       };
     });
