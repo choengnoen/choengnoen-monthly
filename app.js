@@ -1317,7 +1317,7 @@
     try { st = await FBL.loginDirStatus(); } catch (e) { box.innerHTML = ''; return; }
     if (!$('#dirNotice')) return;
     const bad = st.missing.length + st.extra.length;
-    if (st.ready && !bad) { box.innerHTML = '<p class="small muted" style="margin-top:12px">🔒 สมุดชื่อล็อกอิน: ย้ายแล้ว — คนที่ยังไม่ล็อกอินมองไม่เห็นว่าใครเป็นเจ้าของ/ผู้ดูแลระบบ</p>'; return; }
+    if (st.ready && !bad) { box.innerHTML = ''; return; }
     const why = !st.ready
       ? 'ยังไม่ได้ย้ายรายชื่อไปสมุดชื่อล็อกอิน — ตอนนี้คนนอกที่เปิดหน้านี้ยังเห็นว่าใครเป็นเจ้าของ/ผู้ดูแลระบบ กดปุ่มด้านล่างครั้งเดียวเพื่อย้าย (ไม่กระทบการล็อกอินของใคร)'
       : 'สมุดชื่อล็อกอินไม่ตรงกับรายชื่อทีม ' + bad + ' ชื่อ (' + st.missing.concat(st.extra).join(', ') + ') — กดซิงก์เพื่อให้ตรงกัน';
