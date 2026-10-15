@@ -1194,7 +1194,7 @@
       '<div id="expProg" class="hidden" style="margin-top:12px"><div class="progress"><div style="width:0"></div></div><div class="small muted" id="expTxt"></div></div>' +
       '<p class="small muted">ไฟล์ใช้ฟอนต์ Prompt เหมือนรายงานเดิม — เครื่องที่ใช้นำเสนอควรติดตั้งฟอนต์ Prompt ไว้ · กราฟในไฟล์เป็นกราฟของ PowerPoint แก้ตัวเลขต่อได้</p></div></div></div>' +
       '<div class="card"><div class="card-head"><h2>ตัวอย่างสไลด์ทั้งหมด</h2></div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">' +
-      specs.map(function (s, i) { return '<div><div class="small muted" style="margin-bottom:4px">' + (i + 1) + '. ' + esc(s.title) + '</div>' + slideHtml(s) + '</div>'; }).join('') + '</div></div>' +
+      specs.map(function (s, i) { return '<div style="min-width:0"><div class="small muted" title="' + (i + 1) + '. ' + esc(s.title) + '" style="margin-bottom:4px;height:1.5em;line-height:1.5em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (i + 1) + '. ' + esc(s.title) + '</div>' + slideHtml(s) + '</div>'; }).join('') + '</div></div>' +
       '<div class="card"><div class="card-head"><h2>ล้างรูปของเดือนนี้</h2></div><p>ในระบบมีรูปของเดือนนี้ <b>' + monthPhotos.length + '</b> รูป ' +
       '(ประมาณ ' + RE.fmt(monthPhotos.reduce(function (s, x) { return s + (x.size || 0); }, 0) / 1048576, 1) + ' MB) — เมื่อส่งออกและนำเสนอเรียบร้อยแล้วลบได้ หรือระบบจะถามให้ลบตอนเริ่มเดือนใหม่</p>' +
       '<button class="btn btn-danger" id="clearPhotos"' + (monthPhotos.length && FBL.isPrivileged() ? '' : ' disabled') + '>ลบรูปทั้งหมดของเดือนนี้</button>' + (FBL.isPrivileged() ? '' : '<p class="small muted" style="margin-top:8px">ลบรูปได้เฉพาะเจ้าของระบบหรือผู้ดูแลระบบ</p>') + '</div>';
@@ -1329,14 +1329,13 @@
   }
 
   // ถังขยะ (ลบแบบซ่อน) — เจ้าหน้าที่ทั่วไปลบแล้วรายการเข้าถังขยะ เจ้าของ/ผู้ดูแลตรวจแล้วกู้คืนหรือลบจริงที่หน้าตั้งค่า
-  function trashCardHtml() {
-    if (!FBL.isPrivileged()) return '';
+  function trashBodyHtml() {
     const recs = S.trash.records, phs = S.trash.photos;
     const who = function (d) { return esc(d.deletedBy || '') + (d.deletedAt ? ' · ' + esc(String(d.deletedAt).slice(0, 10)) : ''); };
-    let h = '<div class="card"><div class="section-title">🗑 ถังขยะ <span class="sub">(รอตรวจก่อนลบจริง)</span></div>';
-    if (!recs.length && !phs.length) return h + '<p class="set-hint">ว่าง — ที่เจ้าหน้าที่กดลบจะมาอยู่ที่นี่</p></div>';
+    if (!recs.length && !phs.length) return '<p class="set-hint">ว่าง — ที่เจ้าหน้าที่กดลบจะมาอยู่ที่นี่</p>';
+    let h = '';
     if (recs.length) {
-      h += '<h3 style="margin:8px 0;font-size:15px">รายการผลงาน (' + recs.length + ')</h3><table class="tbl"><tr><th>ไฟล์</th><th>รหัส / ทล.</th><th>ลบโดย</th><th></th></tr>' + recs.map(function (r) {
+      h += '<h3 style="margin:0 0 8px;font-size:15px">รายการผลงาน (' + recs.length + ')</h3><table class="tbl"><tr><th>ไฟล์</th><th>รหัส / ทล.</th><th>ลบโดย</th><th></th></tr>' + recs.map(function (r) {
         return '<tr><td>' + esc(r.file || '') + '</td><td>' + esc(r.code || '') + ' ทล.' + esc(r.route || '') + '</td><td class="small">' + who(r) + '</td><td class="row" style="justify-content:flex-end"><button class="btn btn-sm" data-trs="records:' + esc(r.__id) + '">กู้คืน</button><button class="btn btn-sm btn-danger" data-trd="records:' + esc(r.__id) + '">ลบจริง</button></td></tr>';
       }).join('') + '</table>';
     }
@@ -1345,7 +1344,27 @@
         return '<tr><td><img src="' + esc(p.thumb || '') + '" style="height:46px;border-radius:4px"></td><td>' + esc(RE.mkLabel(p.mk)) + '</td><td class="small">' + who(p) + '</td><td class="row" style="justify-content:flex-end"><button class="btn btn-sm" data-trs="photos:' + esc(p.__id) + '">กู้คืน</button><button class="btn btn-sm btn-danger" data-trd="photos:' + esc(p.__id) + '">ลบจริง</button></td></tr>';
       }).join('') + '</table>';
     }
-    return h + '</div>';
+    return h;
+  }
+  // การ์ดถังขยะเต็มกว้าง: ชื่อ + จำนวนรอตรวจ + ปุ่มเปิดถังขยะ (รายการทั้งหมดอยู่ในหน้าต่างที่เปิดจากปุ่ม)
+  function trashCardHtml() {
+    if (!FBL.isPrivileged()) return '';
+    const n = S.trash.records.length + S.trash.photos.length;
+    return '<div class="card"><div class="trash-strip"><div class="section-title" style="margin:0">🗑 ถังขยะ</div>' +
+      (n ? '<span class="count-chip red">รอตรวจ ' + n + ' รายการ</span>' : '<span class="count-chip gray">ว่าง</span>') +
+      '<span style="flex:1"></span><button class="btn btn-outline" id="btnOpenTrash">เปิดถังขยะ</button></div></div>';
+  }
+  let trashBg = null;
+  function refreshTrashModal() {
+    if (!trashBg || !trashBg.isConnected) return;
+    $('.modal-b', trashBg).innerHTML = trashBodyHtml();
+    bindTrash(trashBg);
+  }
+  function openTrash() {
+    modal({
+      title: '🗑 ถังขยะ (รอตรวจก่อนลบจริง)', html: trashBodyHtml(), wide: true, ok: false, cancel: 'ปิด',
+      onOpen: function (bg) { trashBg = bg; bindTrash(bg); }
+    });
   }
   function bindTrash(p) {
     const find = function (v) { const a = v.split(':'); return { col: a[0], id: a.slice(1).join(':'), item: S.trash[a[0]].find(function (x) { return x.__id === a.slice(1).join(':'); }) }; };
@@ -1357,7 +1376,7 @@
         S.trash[t.col] = S.trash[t.col].filter(function (x) { return x !== t.item; });
         if (!S[t.col].some(function (x) { return x.__id === t.id; })) S[t.col].push(t.item);
         if (t.col === 'photos') t.item.id = t.item.__id;
-        renderAll(); renderSettings();
+        renderAll(); renderSettings(); refreshTrashModal();
       };
     });
     $$('[data-trd]', p).forEach(function (b) {
@@ -1366,7 +1385,7 @@
         if (!await confirmBox('ลบจริง?', '<p>ลบถาวร กู้คืนไม่ได้อีก' + (t.col === 'photos' ? ' (ไฟล์รูปใน Drive ไปอยู่ถังขยะของ Drive 30 วัน)' : '') + '</p>', 'ลบจริง', true)) return;
         await run(function () { return t.col === 'photos' ? FBL.deletePhotos([t.id]) : FBL.del('records', t.id); }, 'ลบจริงแล้ว');
         S.trash[t.col] = S.trash[t.col].filter(function (x) { return x !== t.item; });
-        renderSettings();
+        renderSettings(); refreshTrashModal();
       };
     });
   }
@@ -1375,18 +1394,17 @@
     const p = $('[data-panel="settings"]');
     const team = FBL.team();
     const own = FBL.user.isOwner;
-    let h = '<div class="card"><div class="section-title"><span>ระบบควบคุมการเข้าใช้งาน</span><span class="sp"></span><span class="count-chip">เจ้าหน้าที่ ' + team.length + ' คน</span></div>';
+    let h = '<div class="card"><div class="section-title"><span>ผู้ใช้งานระบบ</span><span class="sp"></span>' +
+      (own && !FBL.demo ? '<button class="btn btn-primary" id="nmAdd">+ เพิ่มเจ้าหน้าที่</button>' : '') + '</div>';
     if (FBL.demo) h += '<div class="demo-note">โหมดทดลอง — จัดการทีมได้หลังเชื่อมต่อ Firebase (ดูไฟล์ คู่มือติดตั้ง-อ่านก่อน.md)</div>';
-    const tmRow = function (t) {
-      return '<div class="tm-row"><span class="tm-who"><span>' + esc(t.name) + (t.isOwner ? ' 👑' : t.isAdmin ? ' 🛡️' : '') + '</span></span>' +
-        (own && !FBL.demo ? '<span class="tm-acts">' + (t.isOwner ? '' : '<button class="btn btn-outline btn-sm" data-adm="' + esc(t.name) + '">' + (t.isAdmin ? 'ยกเลิกผู้ดูแล' : 'ตั้งเป็นผู้ดูแล') + '</button>') +
-          '<button class="btn btn-outline btn-sm" data-rpw="' + esc(t.name) + '">ตั้งรหัสผ่านใหม่</button>' + (t.isOwner ? '' : '<button class="btn btn-danger btn-sm" data-rmm="' + esc(t.name) + '">ลบ</button>') + '</span>' : '') + '</div>';
-    };
-    const tmOwners = team.filter(function (t) { return t.isOwner; }), tmStaff = team.filter(function (t) { return !t.isOwner; });
-    h += '<div class="tm-list">' + (tmOwners.length ? '<div class="tm-grp">เจ้าของระบบ</div>' + tmOwners.map(tmRow).join('') : '') +
-      (tmStaff.length ? '<div class="tm-grp">เจ้าหน้าที่</div>' + tmStaff.map(tmRow).join('') : '') + '</div>';
-    if (own && !FBL.demo) h += '<button class="btn btn-outline btn-sm" id="nmAdd" style="margin-top:14px">+ เพิ่มเจ้าหน้าที่</button><div id="dirNotice"></div>';
-    else if (!own) h += '<p class="set-hint">ติดต่อเจ้าของระบบเพื่อขอเพิ่มชื่อหรือรีเซ็ตรหัสผ่าน</p>';
+    const canEdit = own && !FBL.demo;
+    h += '<div class="tbl-wrap tm-tbl"><table class="tbl"><tr><th>ชื่อ</th><th>สิทธิ์</th>' + (canEdit ? '<th></th>' : '') + '</tr>' + team.map(function (t) {
+      return '<tr><td>' + esc(t.name) + '</td><td>' + (t.isOwner ? '<span class="pill gold">👑 เจ้าของระบบ</span>' : t.isAdmin ? '<span class="pill info">🛡️ ผู้ดูแลระบบ</span>' : '<span class="pill gray">เจ้าหน้าที่</span>') + '</td>' +
+        (canEdit ? '<td><span class="tm-acts">' + (t.isOwner ? '' : '<button class="btn btn-outline btn-sm" data-adm="' + esc(t.name) + '">' + (t.isAdmin ? 'ยกเลิกผู้ดูแล' : 'ตั้งเป็นผู้ดูแล') + '</button>') +
+          '<button class="btn btn-outline btn-sm" data-rpw="' + esc(t.name) + '">ตั้งรหัสผ่านใหม่</button>' + (t.isOwner ? '' : '<button class="btn btn-danger btn-sm" data-rmm="' + esc(t.name) + '">ลบ</button>') + '</span></td>' : '') + '</tr>';
+    }).join('') + '</table></div>';
+    if (canEdit) h += '<div id="dirNotice"></div>';
+    else if (!own) h += '<p class="set-hint" style="margin-top:10px">ติดต่อเจ้าของระบบเพื่อขอเพิ่มชื่อหรือรีเซ็ตรหัสผ่าน</p>';
     h += '</div>';
     const byMonth = {};
     S.photos.forEach(function (x) { const m = byMonth[x.mk] = byMonth[x.mk] || { n: 0, size: 0 }; m.n++; m.size += x.size || 0; });
@@ -1402,7 +1420,7 @@
       'ฐานข้อมูล: ' + (FBL.demo ? '<b>โหมดทดลอง (เก็บในเครื่องนี้)</b>' : 'Firebase Firestore') + ' · ที่เก็บรูป: ' + (FBL.photoStore === 'drive' ? 'Google Drive' : 'Firestore') + ' · สายทางจากฐานข้อมูลกลาง CN-Hub: ' + (window.CNMaster && CNMaster.routes && CNMaster.routes().length ? 'เชื่อมต่อแล้ว (' + CNMaster.routes().length + ' สาย)' : 'ยังไม่เชื่อมต่อ — ใช้ชื่อตอนสำรอง') + '</div></div></div>';
     p.innerHTML = h;
     renderDirNotice();
-    bindTrash(p);
+    if (#btnOpenTrash) #btnOpenTrash.onclick = openTrash;
     $$('[data-clr]', p).forEach(function (b) {
       b.onclick = async function () {
         const m = b.getAttribute('data-clr');
