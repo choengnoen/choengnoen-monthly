@@ -1143,7 +1143,7 @@
     const has = photosOf('budget').length > 0, b = photoMgrBudgetName();
     return '<div class="bud-box" data-pdrop-budget="1">' +
       '<div class="bud-head"><button class="btn btn-pmgr" id="budPick" title="แนบรูปกราฟ (รูปใหม่จะแทนรูปเดิม) หรือลากรูปมาวางในกรอบนี้">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน</button>' +
-      (has ? '<span class="pill ok">แนบรูปแล้ว' + (b ? ' · ' + esc(b) : '') + '</span><button class="btn" id="budReread" title="อ่านตัวเลขจากรูปที่แนบไว้ใหม่อีกครั้ง">อ่านค่าจากรูปใหม่</button><button class="btn btn-danger" id="budRemove">ลบรูป</button>' : '') +
+      (has ? '<span class="pill ok">แนบรูปแล้ว' + (b ? ' · ' + esc(b) : '') + '</span><span style="margin-left:auto;display:flex;gap:10px"><button class="btn" id="budReread" title="อ่านตัวเลขจากรูปที่แนบไว้ใหม่อีกครั้ง">อ่านค่าจากรูปใหม่</button><button class="btn btn-danger" id="budRemove">ลบรูป</button></span>' : '') +
       '</div>' +
       '<div style="height:12px"></div>' +
       '<div class="bud-tiles">' +
