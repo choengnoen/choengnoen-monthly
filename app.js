@@ -1375,10 +1375,8 @@
     const p = $('[data-panel="settings"]');
     const team = FBL.team();
     const own = FBL.user.isOwner;
-    const ownerT = team.find(function (t) { return t.isOwner; });
     let h = '<div class="card"><div class="section-title"><span>ระบบควบคุมการเข้าใช้งาน</span><span class="sp"></span><span class="count-chip">เจ้าหน้าที่ ' + team.length + ' คน</span></div>';
     if (FBL.demo) h += '<div class="demo-note">โหมดทดลอง — จัดการทีมได้หลังเชื่อมต่อ Firebase (ดูไฟล์ คู่มือติดตั้ง-อ่านก่อน.md)</div>';
-    if (ownerT) h += '<p class="set-hint">เจ้าของระบบ: <b>' + esc(ownerT.name) + '</b></p>';
     h += '<div class="tm-list">' + team.map(function (t) {
       const role = t.isOwner ? 'เจ้าของระบบ' : t.isAdmin ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่';
       return '<div class="tm-row"><span class="tm-who"><span>' + esc(t.name) + (t.isOwner ? ' 👑' : t.isAdmin ? ' 🛡️' : '') + '</span><small class="tm-sub">' + role + '</small></span>' +
