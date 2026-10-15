@@ -909,7 +909,7 @@
   };
 
   // สรุปแผนงาน - ผลงาน ตามรหัสงาน (6 กลุ่ม)
-  RE.slidePlan = function (mk, plan, cum) {
+  RE.slidePlan = function (mk, plan, cum, banner) {
     const els = [{ type: 'bg', src: A('frame-plan.jpg') }];
     els.push({ type: 'text', x: 2.4, y: TITLE_Y, w: 17.3, h: 1.3, text: 'สรุปแผนงาน - ผลงาน ตามรหัสงาน\nปีงบประมาณ ' + cum.fy, size: 26, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.3 });
     const planG = (plan && plan.groups) || {};
@@ -930,7 +930,10 @@
         { text: 'ผล     ', bold: true, color: INK }, { text: RE.fmt(rv, 0) + ' ( ', color: INK },
         { text: RE.fmt(rTot ? rv / rTot * 100 : 0) + '%', color: RED }, { text: ' )', color: INK }], size: 19, valign: 'middle', wrap: false });
     });
-    els.push({ type: 'image', src: A('plan-banner.jpg'), x: 3.15, y: 6.55, w: 15.9, h: 3.43 });
+    // แบนเนอร์ท้ายหน้า: ใช้รูปที่เลือกไว้ (banner = photoSpec) ไม่มี = รูปเดิมของระบบ
+    const bannerArea = { x: 3.15, y: 6.55, w: 15.9, h: 3.43 };
+    if (banner) els.push(Object.assign({ type: 'photo', id: banner.id, pw: banner.w, ph: banner.h, fx: banner.fx, fy: banner.fy }, bannerArea));
+    else els.push(Object.assign({ type: 'image', src: A('plan-banner.jpg') }, bannerArea));
     return { kind: 'plan', title: 'แผน-ผล ตามรหัสงาน', els: els };
   };
 
@@ -1008,13 +1011,15 @@
     });
     return tessLoading;
   }
-  function cropScaled(img, y0, y1, scale) {
+  // gray = true → ขาวดำเพิ่มคอนทราสต์ (ให้ตัวอ่านเห็นตัวเลขจางๆ ชัดขึ้น); รูปสีเดิมใช้ดูสีเส้นแผน(ส้ม)/ผล(เขียว)
+  function cropScaled(img, y0, y1, scale, gray) {
     const cv = document.createElement('canvas');
     const sh = Math.round((y1 - y0) * img.naturalHeight);
     cv.width = Math.round(img.naturalWidth * scale); cv.height = Math.round(sh * scale);
     const g = cv.getContext('2d');
     g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
     g.imageSmoothingQuality = 'high';
+    if (gray) g.filter = 'grayscale(1) contrast(1.8) brightness(0.95)';
     g.drawImage(img, 0, Math.round(y0 * img.naturalHeight), img.naturalWidth, sh, 0, 0, cv.width, cv.height);
     return cv;
   }
@@ -1022,8 +1027,31 @@
     return (data.words || []).map(function (w) {
       const m = String(w.text).replace(/,/g, '.').match(/(\d{1,3}\.\d{2})/);
       const v = m ? Number(m[1]) : NaN;
-      return isFinite(v) && v >= 0 && v <= 150 ? { v: v, x: w.bbox.x0, y: (w.bbox.y0 + w.bbox.y1) / 2, h: w.bbox.y1 - w.bbox.y0 } : null;
+      return isFinite(v) && v >= 0 && v <= 150 ? { v: v, x: w.bbox.x0, x1: w.bbox.x1, y: (w.bbox.y0 + w.bbox.y1) / 2, h: w.bbox.y1 - w.bbox.y0 } : null;
     }).filter(Boolean);
+  }
+  // สีจุดเล็กๆ ซ้ายของตัวเลข: ส้ม = แผน, เขียว = ผล (ไม่ชัด = null)
+  function seriesOf(cv, w) {
+    const g = cv.getContext('2d');
+    const x0 = Math.max(0, Math.round(w.x - w.h * 10)), x1 = Math.max(x0 + 1, Math.round(w.x));
+    const y0 = Math.max(0, Math.round(w.y - w.h)), hh = Math.max(2, Math.round(w.h * 2));
+    let d; try { d = g.getImageData(x0, y0, x1 - x0, Math.min(hh, cv.height - y0)).data; } catch (e) { return null; }
+    let o = 0, gr = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], gg = d[i + 1], b = d[i + 2];
+      if (r > 200 && gg > 90 && gg < 200 && b < 120 && r - b > 90) o++;
+      else if (gg > r + 25 && gg > b + 25 && gg < 190) gr++;
+    }
+    if (o < 3 && gr < 3) return null;
+    return o > gr * 1.3 ? 'plan' : (gr > o * 1.3 ? 'result' : null);
+  }
+  // เลือกคู่ (แผน, ผล) จากตัวเลขที่อ่านได้: ใช้สีเส้นก่อน ไม่ได้ก็ใช้ลำดับ (ซ้าย/บน = แผน)
+  function pickPair(ws, cv) {
+    if (ws.length < 2) return null;
+    ws.forEach(function (w) { w.s = seriesOf(cv, w); });
+    const p = ws.filter(function (w) { return w.s === 'plan'; })[0], r = ws.filter(function (w) { return w.s === 'result'; })[0];
+    if (p && r) return { plan: p.v, result: r.v };
+    return { plan: ws[0].v, result: ws[1].v };
   }
   RE.readBudgetChart = async function (file) {
     const T = await loadTesseract();
@@ -1032,17 +1060,24 @@
       const img = await new Promise(function (res, rej) { const i = new Image(); i.onload = function () { res(i); }; i.onerror = function () { rej(new Error('เปิดรูปไม่ได้')); }; i.src = url; });
       const worker = await T.createWorker('eng');
       try {
-        await worker.setParameters({ tessedit_pageseg_mode: '11' });   // ข้อความกระจัดกระจาย (เหมาะกับกราฟ)
-        // รอบ 1: แถบล่าง 25% ของรูป (คำอธิบายกราฟ) ขยาย 3 เท่า
-        let ws = pctWords((await worker.recognize(cropScaled(img, 0.75, 1, 3))).data);
-        if (ws.length >= 2) {
-          const maxY = Math.max.apply(null, ws.map(function (w) { return w.y; }));
-          const row = ws.filter(function (w) { return maxY - w.y < Math.max(w.h, 10) * 1.2; }).sort(function (a, b) { return a.x - b.x; });
-          if (row.length >= 2) return { plan: row[0].v, result: row[1].v };
+        // หลายรอบ ไล่จากแม่นสุด: (ก) คำอธิบายกราฟแถวล่างสุด "แผน 92.62  ผล 83.18" (ข) ป้ายค่าบนกราฟ/ทั้งรูป
+        const passes = [[0.75, 1, 3, true, '11'], [0.75, 1, 4, false, '6'], [0.8, 1, 4, true, '6'], [0, 1, 2, true, '11'], [0, 1, 3, false, '11'], [0, 1, 3, true, '12']];
+        for (let k = 0; k < passes.length; k++) {
+          const ps = passes[k], bottom = ps[0] > 0;
+          await worker.setParameters({ tessedit_pageseg_mode: ps[4] });
+          const cvColor = cropScaled(img, ps[0], ps[1], ps[2], false);
+          const cvOcr = ps[3] ? cropScaled(img, ps[0], ps[1], ps[2], true) : cvColor;
+          const ws = pctWords((await worker.recognize(cvOcr)).data);
+          if (ws.length < 2) continue;
+          if (bottom) {
+            const maxY = Math.max.apply(null, ws.map(function (w) { return w.y; }));
+            const row = ws.filter(function (w) { return maxY - w.y < Math.max(w.h, 10) * 1.2; }).sort(function (a, b) { return a.x - b.x; });
+            if (row.length >= 2) return pickPair(row, cvColor);
+          } else {
+            return pickPair(ws, cvColor);
+          }
         }
-        // รอบ 2: ทั้งรูป ขยาย 2 เท่า — ใช้ 2 ค่าแรกตามลำดับการอ่าน (ป้ายแผนอยู่เหนือป้ายผล)
-        ws = pctWords((await worker.recognize(cropScaled(img, 0, 1, 2))).data);
-        return ws.length >= 2 ? { plan: ws[0].v, result: ws[1].v } : null;
+        return null;
       } finally { await worker.terminate(); }
     } finally { URL.revokeObjectURL(url); }
   };

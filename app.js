@@ -642,6 +642,7 @@
   function photoMgrHtml() {
     const slot = photoMgr.slot, n = photosOf(slot).length;
     if (slot === 'cover') return '<div class="drop small" data-pdrop="cover"><b>เปลี่ยนรูปปก</b> — ลากรูปมาวาง หรือคลิกเลือก (ใช้รูปแนวนอน)</div>' + thumbsHtml(slot);
+    if (slot === 'planbanner') return '<div class="drop small" data-pdrop="planbanner"><b>เปลี่ยนรูปแบนเนอร์</b> — ลากรูปมาวาง หรือคลิกเลือก (ใช้รูปแนวนอนยาว)<br><span class="muted">คลิกบนรูปเพื่อเลือกจุดที่ต้องการให้อยู่กลางกรอบ · ลบรูป = กลับไปใช้รูปเดิมของระบบ</span></div>' + thumbsHtml(slot);
     return '<div class="drop small" data-pdrop="' + esc(slot) + '"><b>+ เพิ่มรูป</b> ลากมาวาง หรือคลิกเลือก<br><span class="muted">ตอนนี้ ' + n + '/' + RE.MAX_PHOTOS + ' รูป · แนะนำ 4 รูป</span></div>' +
       thumbsHtml(slot) + layoutSelectHtml(slot, n, photoMgr.lay());
   }
@@ -650,7 +651,7 @@
     bindLayoutSelects(root);
     $$('[data-pdrop]', root).forEach(function (d) {
       const s = d.getAttribute('data-pdrop');
-      if (s === 'cover') bindDrop(d, 'image/*', false, function (files) { addPhotos(files, 'cover', { single: true }); });
+      if (s === 'cover' || s === 'planbanner') bindDrop(d, 'image/*', false, function (files) { addPhotos(files, s, { single: true }); });
       else bindDrop(d, 'image/*', true, function (files) { addPhotos(files, s); });
     });
   }
@@ -1066,18 +1067,11 @@
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 1: สรุปผลงานบำรุงปกติ ประจำเดือน</h3><div id="planPrev0"></div></div>' +
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 2: แผน-ผล ตามรหัสงาน</h3><div id="planPrev1"></div></div>' +
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 3: ความก้าวหน้าการใช้งบประมาณ</h3><div id="planPrev2"></div>' +
-      '<div class="drop small" style="margin-top:10px" data-pdrop-budget="1"><b>+ เพิ่มรูปกราฟ</b> — แคปกราฟจากระบบของกรมแล้วลากมาวาง หรือคลิกเลือก (รูปใหม่จะแทนรูปเดิม)</div>' +
-      (photosOf('budget').length ? thumbsHtml('budget') : '') +
-      '<p class="small muted" style="margin-top:12px">ข้อความใต้กราฟ: ยอดเงินแผน/ผล มาจากตาราง "แผนและผลตามกลุ่มงาน" ด้านบน · % แผน/ผลสะสม ระบบอ่านจากรูปกราฟให้ (แก้ได้)</p>' +
-      '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
-      '<div><label class="f">% แผนสะสม (จากกราฟ)</label><input type="text" inputmode="decimal" id="budgetPctPlan" style="width:140px" value="' + esc(budgetPct().plan) + '"></div>' +
-      '<div><label class="f">% ผลสะสม (จากกราฟ)</label><input type="text" inputmode="decimal" id="budgetPctResult" style="width:140px" value="' + esc(budgetPct().result) + '"></div>' +
-      '<div><label class="f">ตัดชื่อกราฟบนรูปออก (% ของความสูงรูป)</label><input type="text" inputmode="decimal" id="budgetCropTop" style="width:140px" value="' + esc(budgetPct().cropTop) + '"></div></div>' +
-      '<p class="small" id="budgetDiffHint" style="margin-top:10px;font-weight:600">' + esc(budgetDiffHint()) + '</p>' +
+      budgetBoxHtml(cum) +
       '</div>';
     p.innerHTML = h;
-    bindThumbs(p);
-    bindDrop($('[data-pdrop-budget]', p), 'image/*', false, addBudgetImage);
+    bindBudgetBox(p);
+    $('#planBannerBtn').onclick = function () { openPhotoMgr('planbanner', 'จัดการรูปแบนเนอร์ หน้าแผน-ผล', function () { return { name: '' }; }); };
     const savePct = debounce(function () { run(function () { return saveReport({ budgetPct: budgetPct() }); }); }, 700);
     $('#budgetPctPlan').addEventListener('input', savePct);
     $('#budgetPctResult').addEventListener('input', savePct);
@@ -1124,6 +1118,7 @@
     d.planSource = { file: f.name, mk: S.mk, importedAt: FBL.nowIso(), importedBy: FBL.user.name };
     run(function () { return FBL.set('plans', String(fy), Object.assign(d, { fy: fy, updatedAt: FBL.nowIso(), updatedBy: FBL.user.name })); }, 'อัปเดตแผน-ผลจากไฟล์แล้ว').then(renderAll);
   }
+  function planBannerImg() { const b = photosOf('planbanner')[0]; return b ? photoSpec(b) : null; }
   function budgetImg() { const b = photosOf('budget')[0]; return b ? photoSpec(b) : null; }
   // % แผน/ผลสะสมจากรูปกราฟ (เก็บในรายงานของเดือน เป็นข้อความตามที่พิมพ์) — ช่องที่กำลังแก้อยู่มาก่อนค่าที่บันทึกไว้
   function budgetPct() {
@@ -1131,27 +1126,72 @@
     const val = function (id, v) { return $(id) ? $(id).value.replace(/[,%\s]/g, '') : (v == null ? '' : String(v)); };
     return { plan: val('#budgetPctPlan', r.plan), result: val('#budgetPctResult', r.result), cropTop: val('#budgetCropTop', r.cropTop == null ? '10' : r.cropTop) };
   }
-  // บรรทัดสรุปส่วนต่าง แผน-ผล ใต้ช่องกรอก % (ให้เห็นก่อนส่งออก)
-  function budgetDiffHint() {
+  // ส่วนต่าง แผน-ผล คำนวณอัตโนมัติจาก % ที่อ่านได้จากรูปกราฟ (แก้ค่าเองได้) → { title, sub, cls }
+  function budgetDiffInfo(planTotal) {
     const p = budgetPct(), a = parseFloat(p.plan), b = parseFloat(p.result);
-    if (!isFinite(a) || !isFinite(b)) return 'กรอก % แผนสะสม และ % ผลสะสม ทั้งสองช่อง ระบบจึงจะแสดงส่วนต่างแผน-ผลใต้กราฟ';
+    if (!isFinite(a) || !isFinite(b)) return { title: 'รออ่านค่าจากรูป', sub: 'แนบรูปกราฟแล้วระบบจะคำนวณให้เอง', cls: '' };
     const d = Math.round((b - a) * 100) / 100;
-    if (d === 0) return 'ส่วนต่าง: ผลเท่ากับแผน';
-    return 'ส่วนต่าง: ผล' + (d > 0 ? 'มากกว่า' : 'น้อยกว่า') + 'แผน ' + RE.fmt(Math.abs(d)) + ' %';
+    if (d === 0) return { title: 'ผลเท่ากับแผน', sub: '', cls: 'eq' };
+    return { title: 'ผล' + (d > 0 ? 'มากกว่า' : 'น้อยกว่า') + 'แผน ' + RE.fmt(Math.abs(d)) + ' %',
+      sub: planTotal ? 'คิดเป็นเงิน ' + RE.fmt(Math.abs(d) / 100 * planTotal) + ' บาท' : '', cls: d > 0 ? 'up' : 'down' };
+  }
+  function budgetDiffHtml(planTotal) {
+    const i = budgetDiffInfo(planTotal);
+    return '<div class="bud-diff ' + i.cls + '"><b>' + esc(i.title) + '</b>' + (i.sub ? '<span>' + esc(i.sub) + '</span>' : '') + '</div>';
+  }
+  // ช่องแนบรูปกราฟความก้าวหน้า (ปุ่ม "แนบภาพรายงาน" แบบเดียวกับหน้า 2 + ค่าที่อ่านได้ + ส่วนต่างอัตโนมัติ)
+  function budgetBoxHtml(cum) {
+    const has = photosOf('budget').length > 0, b = photoMgrBudgetName();
+    return '<div class="bud-box" data-pdrop-budget="1">' +
+      '<div class="bud-head"><button class="btn btn-pmgr" id="budPick" title="แนบรูปกราฟ (รูปใหม่จะแทนรูปเดิม) หรือลากรูปมาวางในกรอบนี้">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน</button>' +
+      (has ? '<span class="pill ok">แนบรูปแล้ว' + (b ? ' · ' + esc(b) : '') + '</span><button class="btn" id="budReread" title="อ่านตัวเลขจากรูปที่แนบไว้ใหม่อีกครั้ง">อ่านค่าจากรูปใหม่</button><button class="btn btn-danger" id="budRemove">ลบรูป</button>' : '') +
+      '</div>' +
+      '<p class="small muted" style="margin:8px 0 12px">แคปกราฟจากระบบของกรมแล้วแนบ — ระบบอ่าน % แผน/ผลสะสมจากรูป แล้วคำนวณส่วนต่างให้อัตโนมัติ (ลากรูปมาวางในกรอบนี้ได้) · ยอดเงินแผน/ผลมาจากตารางด้านบน</p>' +
+      '<div class="bud-tiles">' +
+      '<div class="bud-tile"><label class="f">แผนสะสม</label><div class="bud-in"><input type="text" inputmode="decimal" id="budgetPctPlan" value="' + esc(budgetPct().plan) + '" placeholder="—"><i>%</i></div></div>' +
+      '<div class="bud-tile"><label class="f">ผลสะสม</label><div class="bud-in"><input type="text" inputmode="decimal" id="budgetPctResult" value="' + esc(budgetPct().result) + '" placeholder="—"><i>%</i></div></div>' +
+      '<div class="bud-tile bud-tile-diff"><label class="f">ส่วนต่าง แผน-ผล</label><div id="budDiff">' + budgetDiffHtml(cum && cum.planTotal) + '</div></div>' +
+      '</div>' +
+      '<details class="small" style="margin-top:12px"><summary class="muted" style="cursor:pointer">ตั้งค่าเพิ่มเติม</summary>' +
+      '<div style="margin-top:8px"><label class="f">ตัดชื่อกราฟที่ติดมากับรูปออก (% ของความสูงรูป · 0 = ไม่ตัด)</label><input type="text" inputmode="decimal" id="budgetCropTop" style="width:140px" value="' + esc(budgetPct().cropTop) + '"></div></details>' +
+      '</div>';
+  }
+  function photoMgrBudgetName() { const b = photosOf('budget')[0]; return b && b.name ? b.name : ''; }
+  function bindBudgetBox(p) {
+    const box = $('[data-pdrop-budget]', p);
+    box.ondragover = function (e) { e.preventDefault(); box.classList.add('over'); };
+    box.ondragleave = function () { box.classList.remove('over'); };
+    box.ondrop = function (e) { e.preventDefault(); box.classList.remove('over'); addBudgetImage(Array.prototype.slice.call(e.dataTransfer.files)); };
+    $('#budPick').onclick = function () { pickFiles('image/*', false, addBudgetImage); };
+    if ($('#budReread')) $('#budReread').onclick = function () {
+      const ph = photosOf('budget')[0];
+      if (!ph) return;
+      FBL.photoBytes(ph.__id).then(function (bytes) { return readBudgetPct(new Blob([bytes], { type: 'image/jpeg' })); })
+        .catch(function (e) { toast(e.message || String(e), 'err'); });
+    };
+    if ($('#budRemove')) $('#budRemove').onclick = async function () {
+      const ph = photosOf('budget');
+      if (await confirmBox('ลบรูปกราฟ?', '<p>ลบออกจากรายงาน (ย้ายไปถังขยะ — เจ้าของ/ผู้ดูแลตรวจก่อนลบจริง)</p>', 'ลบรูป', true))
+        run(function () { return FBL.setDeleted('photos', ph.map(function (x) { return x.__id; }), true); });
+    };
   }
   // ใส่รูปกราฟ: บันทึกรูป + อ่าน % แผน/ผลจากรูปแล้วกรอก 2 บรรทัดให้ (อ่านจากไฟล์ต้นฉบับที่คมกว่ารูปที่ย่อแล้ว)
   function addBudgetImage(files) {
     const f = files.filter(function (x) { return /^image\//.test(x.type) || /\.(jpe?g|png|webp)$/i.test(x.name); })[0];
     if (!f) { toast('ไม่พบไฟล์รูปภาพ', 'err'); return; }
     addPhotos([f], 'budget', { single: true });
+    readBudgetPct(f);
+  }
+  // อ่าน % แผน/ผลสะสมจากรูป (ไฟล์ต้นฉบับหรือรูปที่แนบไว้) แล้วกรอกช่อง + บันทึก → ส่วนต่างคำนวณเอง
+  function readBudgetPct(f) {
     const t = toast('กำลังอ่านตัวเลขจากรูปกราฟ…', '', 120000);
-    RE.readBudgetChart(f).then(function (v) {
+    return RE.readBudgetChart(f).then(function (v) {
       t.remove();
-      if (!v) { toast('อ่านตัวเลข % แผน/ผล จากรูปไม่ได้ — พิมพ์ 2 บรรทัดใต้กราฟเองได้', 'err', 7000); return; }
+      if (!v) { toast('อ่านตัวเลข % แผน/ผล จากรูปไม่ได้ — พิมพ์ในช่องแผนสะสม/ผลสะสมเองได้', 'err', 7000); return; }
       const pv = { plan: RE.fmt(v.plan).replace(/,/g, ''), result: RE.fmt(v.result).replace(/,/g, ''), cropTop: budgetPct().cropTop };
       if ($('#budgetPctPlan')) { $('#budgetPctPlan').value = pv.plan; $('#budgetPctResult').value = pv.result; renderPlanPreview(); }
       return saveReport({ budgetPct: pv }).then(function () {
-        toast('อ่านได้: แผน ' + RE.fmt(v.plan) + '% · ผล ' + RE.fmt(v.result) + '% — ตรวจตัวเลขเทียบกับรูปอีกครั้ง', 'ok', 7000);
+        toast('อ่านได้: แผน ' + RE.fmt(v.plan) + '% · ผล ' + RE.fmt(v.result) + '% · ' + budgetDiffInfo(0).title + ' — ตรวจเทียบกับรูปอีกครั้ง', 'ok', 8000);
       });
     }).catch(function (e) { t.remove(); console.error(e); toast(e.message || String(e), 'err'); });
   }
@@ -1167,9 +1207,9 @@
       const aggs = RE.aggregate(monthRecords());
       $('#planPrev0').innerHTML = aggs.length ? slideHtml(RE.slideMonthSummary(S.mk, aggs)) : '<p class="muted">ยังไม่มีผลงานของเดือน ' + esc(RE.mkLabel(S.mk)) + ' — นำเข้า Export_CSV ในแท็บ ① ก่อน</p>';
     }
-    if ($('#planPrev1')) $('#planPrev1').innerHTML = slideHtml(RE.slidePlan(S.mk, plan, cum));
+    if ($('#planPrev1')) $('#planPrev1').innerHTML = slideHtml(RE.slidePlan(S.mk, plan, cum, planBannerImg()));
     if ($('#planPrev2')) $('#planPrev2').innerHTML = slideHtml(RE.slideBudget(S.mk, plan, cum, budgetImg(), budgetPct()));
-    if ($('#budgetDiffHint')) $('#budgetDiffHint').textContent = budgetDiffHint();
+    if ($('#budDiff')) $('#budDiff').innerHTML = budgetDiffHtml(cum.planTotal);
   }
 
   /* ======================================================================
@@ -1187,7 +1227,7 @@
       specs.push(workSpec(a));
     });
     if (aggs.length) specs.push(RE.slideMonthSummary(S.mk, aggs));
-    if (plan && cum.planTotal > 0) specs.push(RE.slidePlan(S.mk, plan, cum));
+    if (plan && cum.planTotal > 0) specs.push(RE.slidePlan(S.mk, plan, cum, planBannerImg()));
     if (budgetImg()) specs.push(RE.slideBudget(S.mk, plan || {}, cum, budgetImg(), budgetPct()));
     (r.problems || []).forEach(function (pr) { problemSpecs(pr).forEach(function (s) { specs.push(s); }); });
     specs.push(RE.slideEnd());

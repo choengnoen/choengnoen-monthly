@@ -56,6 +56,20 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn-pmgr{gap:8px;border:1.5px solid var(--navy-800);color:var(--navy-800);background:#fff}
 .btn-pmgr .ico{flex:none;color:var(--navy-700)}
 .btn-pmgr:hover{background:var(--navy-100);border-color:var(--navy-900)}
+.bud-box{margin-top:12px;border:2px dashed #b9c6d4;border-radius:14px;padding:16px;background:#fafcfe;transition:.15s}
+.bud-box.over{border-color:var(--blue);background:#eef5ff}
+.bud-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bud-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.bud-tile{background:#fff;border:1px solid #dbe3ec;border-radius:12px;padding:10px 14px}
+.bud-in{display:flex;align-items:baseline;gap:6px}
+.bud-in input{width:100%;border:0;border-bottom:2px solid #dbe3ec;border-radius:0;background:transparent;font-size:24px;font-weight:700;padding:2px 0;color:var(--navy-800)}
+.bud-in input:focus{outline:0;border-bottom-color:var(--blue)}
+.bud-in i{font-style:normal;color:var(--ink-soft);font-weight:600}
+.bud-diff{display:flex;flex-direction:column;gap:2px;font-size:15px;color:var(--ink-soft)}
+.bud-diff b{font-size:20px;color:var(--navy-800)}
+.bud-diff.up b{color:#1e7b1e}
+.bud-diff.down b{color:#c62828}
+.bud-tile-diff{background:#f4f8fc}
 .btn-icon{padding:4px 8px;font-size:13px;border-radius:7px}
 input[type=text],input[type=password],input[type=number],select,textarea{border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;width:100%}
 input:focus,select:focus,textarea:focus{outline:2px solid #9cc0ea;border-color:#6c9fd8}
