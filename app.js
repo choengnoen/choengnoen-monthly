@@ -1395,7 +1395,7 @@
       (FBL.photoStore === 'drive'
         ? '<p class="small muted">ตัวรูปเก็บใน Google Drive (โฟลเดอร์ "ระบบรายงานประจำเดือน - รูปภาพ" แยกตามเดือน) — ลบแล้วอยู่ในถังขยะของ Drive กู้คืนได้ 30 วัน</p></div>'
         : '<p class="small muted">Firebase แผนฟรีเก็บข้อมูลได้ 1 GB — รูปเดือนละ ~50 รูป ใช้ประมาณ 25–40 MB</p></div>');
-    h += '<div class="card"><div class="card-head"><h2>เกี่ยวกับระบบ</h2></div><div class="small">งานรายงานประจำเดือน หมวดทางหลวงเชิงเนิน · รุ่น 1.0 (26 ก.ย. 2569)<br>' +
+    h += '<div class="card"><div class="card-head"><h2>เกี่ยวกับระบบ</h2></div><div class="small">รายงานประจำเดือน หมวดทางหลวงเชิงเนิน · รุ่น 1.0 (26 ก.ย. 2569)<br>' +
       'ฐานข้อมูล: ' + (FBL.demo ? '<b>โหมดทดลอง (เก็บในเครื่องนี้)</b>' : 'Firebase Firestore') + ' · ที่เก็บรูป: ' + (FBL.photoStore === 'drive' ? 'Google Drive' : 'Firestore') + ' · สายทางจากฐานข้อมูลกลาง CN-Hub: ' + (window.CNMaster && CNMaster.routes && CNMaster.routes().length ? 'เชื่อมต่อแล้ว (' + CNMaster.routes().length + ' สาย)' : 'ยังไม่เชื่อมต่อ — ใช้ชื่อตอนสำรอง') + '</div></div>';
     p.innerHTML = h;
     renderDirNotice();
