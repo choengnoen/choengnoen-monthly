@@ -158,24 +158,27 @@ main{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
 .unit-item b{flex:none;width:48px}
 .unit-item input,.unit-item select,.unit-box input,.unit-box select{padding:3px 8px;font-size:13px;min-width:0;width:84px;flex:none}
 /* ช่องเลือกหน่วย: เว้นที่ให้ลูกศรของ iPad/Safari ไม่ให้ทับตัวอักษร และสูงพอให้ตัวอักษรไทย (สระ/วรรณยุกต์) ไม่ถูกตัด */
-.unit-item select,.unit-box select,table.tbl-units select{-webkit-appearance:none;appearance:none;padding-right:26px;line-height:1.5;min-height:34px;cursor:pointer;
+.unit-item select,.unit-box select,.ru-sel select{-webkit-appearance:none;appearance:none;padding-right:26px;line-height:1.5;min-height:34px;cursor:pointer;
   background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238792a0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center}
-.unit-item input,.unit-box input,table.tbl-units input{line-height:1.5;min-height:34px}
+.unit-item input,.unit-box input,.ru-sel input{line-height:1.5;min-height:34px}
 .unit-box select,.unit-box input{width:104px}
-/* ตาราง "หน่วยนับแยกตามไฟล์": ให้แต่ละคอลัมน์กว้างพอ ไม่บีบจนวันที่/สายทางตัดบรรทัดซ้อนกัน แคบมากให้เลื่อนข้างได้ */
-.work .tbl-wrap:has(.tbl-units){overflow-x:auto;-webkit-overflow-scrolling:touch}
-table.tbl-units{table-layout:auto;min-width:380px;font-size:13px}
-table.tbl-units th,table.tbl-units td{padding-left:6px;padding-right:6px}
-table.tbl-units td:first-child{min-width:86px}
-table.tbl-units td:nth-child(2):not(.num){min-width:120px}
-table.tbl-units td.num{white-space:nowrap;text-align:right}
-table.tbl-units td:last-child{width:1%;white-space:nowrap}
-table.tbl-units select,table.tbl-units input{width:100px;min-width:0}
-table.tbl-units .km{display:inline-block;white-space:nowrap}
-/* จอสัมผัส (iPad): ช่องกรอก/เลือกขนาด 16px กันหน้าเว็บซูมเองเวลาแตะ และปุ่มแตะง่ายขึ้น */
+/* "แยกหน่วยรายไฟล์": กางเมื่อจำเป็น · แถวกะทัดรัด 2 บรรทัด (วันที่ | ปริมาณ | หน่วย / สายทาง) ไม่มีแถบเลื่อนข้าง */
+.ru{margin:10px 0 0}
+.ru-toggle{background:none;border:0;padding:4px 0;font:inherit;font-size:13px;font-weight:600;color:var(--navy-900);cursor:pointer}
+.ru-toggle:hover{text-decoration:underline}
+.ru-head{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px}
+.ru-head .sp{flex:1}
+.ru-list{border:1px solid #e6ebf1;border-radius:12px;background:#fff;overflow:hidden}
+.ru-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:2px 10px;align-items:center;padding:8px 10px;border-top:1px solid #eef2f7}
+.ru-row:first-child{border-top:0}
+.ru-date{font-size:13px;line-height:1.45;min-width:0}
+.ru-code{display:inline-block;margin-right:6px;padding:0 6px;border-radius:6px;background:#eef2f7;font-size:12px;font-weight:700}
+.ru-qty{text-align:right;font-weight:700;font-size:13px;white-space:nowrap}
+.ru-route{grid-column:1 / -1;font-size:12px;color:#8792a0;white-space:nowrap}
+.ru-sel select,.ru-sel input{width:96px;min-width:0;padding:3px 8px;font-size:13px}/* จอสัมผัส (iPad): ช่องกรอก/เลือกขนาด 16px กันหน้าเว็บซูมเองเวลาแตะ และปุ่มแตะง่ายขึ้น */
 @media (pointer:coarse){
   input[type=text],input[type=password],input[type=number],select,textarea{font-size:16px}
-  .unit-item select,.unit-box select,table.tbl-units select,.unit-item input,.unit-box input,table.tbl-units input{font-size:16px;min-height:40px}
+  .unit-item select,.unit-box select,.ru-sel select,.unit-item input,.unit-box input,.ru-sel input{font-size:16px;min-height:40px}
   .btn{min-height:40px}
   .btn-sm{min-height:36px}
 }

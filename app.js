@@ -262,7 +262,7 @@
     };
   }
 
-  let started = false, session = 0, masterHooked = false;
+  let started = false, session = 0, masterHooked = false, fontsKicked = false;
   FBL.onError = function (m) { toast(m, 'err'); };
   FBL.onAuth(function (user, err) {
     if (user) { startApp(); return; }
@@ -312,7 +312,6 @@
         .then(function () { if (started && !document.querySelector('.modal-bg')) renderAll(); }).catch(function () {});
     }
   }
-  let fontsKicked = false;
 
   // ข้อมูลเปลี่ยนจากเครื่องอื่น: วาดใหม่ แต่ไม่วาดทับช่องที่กำลังพิมพ์อยู่
   const scheduleRender = debounce(function () {
@@ -728,21 +727,33 @@
     if (ch.length === 1) return '<input type="text" value="' + esc(cur) + '" readonly>';
     return '<input type="text" list="unitList" data-recunit="' + id + '" value="' + esc(cur) + '">';
   }
+  // หน่วยนับ 2 ระดับ: ช่องด้านบน (rep().units) = หน่วยของทุกไฟล์ในรหัสนั้น · รายไฟล์ (rep().recUnits) = ข้อยกเว้นเฉพาะไฟล์
+  // เปลี่ยนช่องด้านบน = ล้างข้อยกเว้นรายไฟล์ของรหัสนั้น (ให้ทุกไฟล์ใช้หน่วยเดียวกัน)
+  // รายไฟล์แสดงเมื่อกด "แยกหน่วยรายไฟล์" หรือเมื่อมีไฟล์ที่หน่วยต่างกันอยู่แล้ว (ซ่อนไม่ได้ ไม่งั้นมองไม่เห็นว่าต่างกัน)
+  const splitOpen = {};   // รหัสงาน → true/false ที่ผู้ใช้กดเอง (ไม่เคยกด = ตัดสินอัตโนมัติ)
   function recUnitsHtml(a) {
     const recs = a.records || [];
+    if (recs.length < 2) return '';                                                      // ไฟล์เดียว = ช่องด้านบนพอ
     if (!recs.some(function (r) { return unitChoices(r.code).length !== 1; })) return '';   // ทุกรหัสมีหน่วยเดียว = ไม่มีอะไรให้เลือก
-    const all = [];
-    recs.forEach(function (r) { unitChoices(r.code).forEach(function (u) { if (all.indexOf(u) < 0) all.push(u); }); });
-    let h = '<div style="margin:12px 0 0"><label class="f">หน่วยนับแยกตามไฟล์' + (a.sameUnit ? '' : ' <span class="pill info">มี ' + a.qtyParts.length + ' หน่วยในเดือนนี้</span>') + '</label>' +
-      '<div class="tbl-wrap"><table class="tbl tbl-sum tbl-units"><thead><tr><th>วันที่</th>' + (a.merged ? '<th>รหัส</th>' : '') + '<th>สายทาง / กม.</th><th class="num">ปริมาณ</th><th>หน่วย</th></tr></thead><tbody>';
+    const mixed = !a.sameUnit;
+    const open = mixed || splitOpen[a.code] === true;
+    const code = esc(a.code);
+    let h = '<div class="ru">';
+    if (!open) {
+      return h + '<button type="button" class="ru-toggle" data-split="' + code + '">▸ แยกหน่วยรายไฟล์ <span class="muted">(' + a.days + ' วัน · ' + recs.length + ' ไฟล์)</span></button></div>';
+    }
+    h += '<div class="ru-head"><b>แยกหน่วยรายไฟล์</b>' +
+      (mixed ? ' <span class="pill info">มี ' + a.qtyParts.length + ' หน่วยในเดือนนี้</span>' : '') +
+      '<span class="sp"></span>' + (mixed ? '' : '<button type="button" class="ru-toggle" data-split="' + code + '">ย่อ ▴</button>') + '</div>';
+    if (mixed) h += '<p class="small muted" style="margin:0 0 6px">อยากให้ทุกไฟล์ใช้หน่วยเดียวกัน ให้เลือกที่ช่อง "หน่วยนับ" ด้านบน</p>';
+    h += '<div class="ru-list">';
     recs.forEach(function (r) {
-      h += '<tr title="' + esc(r.file) + '"><td class="small">' + compactDates(r.dates) + '</td>' + (a.merged ? '<td>' + esc(r.code) + '</td>' : '') +
-        '<td class="small">ทล.' + esc(r.route) + ' <span class="km muted">กม. ' + esc(r.kmFrom) + '–' + esc(r.kmTo) + '</span></td>' +
-        '<td class="num">' + RE.fmtQty(r.qty) + '</td><td>' + recUnitFieldHtml(r) + '</td></tr>';
+      h += '<div class="ru-row" title="' + esc(r.file) + '">' +
+        '<div class="ru-date">' + (a.merged ? '<span class="ru-code">' + esc(r.code) + '</span>' : '') + compactDates(r.dates) + '</div>' +
+        '<div class="ru-qty">' + RE.fmtQty(r.qty) + '</div><div class="ru-sel">' + recUnitFieldHtml(r) + '</div>' +
+        '<div class="ru-route">ทล.' + esc(r.route) + ' กม. ' + esc(r.kmFrom) + '–' + esc(r.kmTo) + '</div></div>';
     });
-    h += '</tbody></table></div>';
-    if (all.length > 1) h += '<p class="small muted" style="margin:6px 0 0">ตั้งทุกไฟล์เป็น: <select data-allunit="' + a.code + '"><option value="">— เลือก —</option>' + all.map(function (u) { return '<option>' + esc(u) + '</option>'; }).join('') + '</select></p>';
-    return h + '</div>';
+    return h + '</div></div>';
   }
   function renderWork() {
     const p = $('[data-panel="work"]');
@@ -771,7 +782,7 @@
       const unitHtml = a.merged
         ? '<div class="unit-grid">' + a.subs.map(function (c) { return '<div class="unit-item"><b class="small">' + c + '</b>' + unitFieldHtml(c) + '</div>'; }).join('') + '</div>' +
           a.subs.map(unitNoteHtml).join('')
-        : '<div class="row"><div class="unit-box"><label class="f">หน่วยนับตั้งต้น</label>' + unitFieldHtml(a.code) + '</div></div>' + unitNoteHtml(a.code);
+        : '<div class="row"><div class="unit-box"><label class="f">หน่วยนับ</label>' + unitFieldHtml(a.code) + '</div></div>' + unitNoteHtml(a.code);
       // สรุปจำนวนไฟล์/วันทำงาน/สายทาง — แสดงเหนือกล่อง + เพิ่มรูป
       const summaryHtml = '<div class="muted small" style="margin:0 0 8px">' + a.count + ' ไฟล์ · ' + a.days + ' วันทำงาน · ' + a.lines.length + (a.merged ? ' รายการสายทาง' : ' สายทาง') + '</div>';
       const qtyTxt = a.qtyParts.map(function (q) { return RE.fmtQty(q.qty) + ' ' + esc(q.unit); }).join(' + ');
@@ -829,9 +840,20 @@
     });
     $$('[data-unit]', p).forEach(function (inp) {
       inp.onchange = function () {
+        const code = inp.getAttribute('data-unit');
         const u = Object.assign({}, rep().units || {});
-        u[inp.getAttribute('data-unit')] = inp.value.trim();
-        run(function () { return saveReport({ units: u }); });
+        u[code] = inp.value.trim();
+        // ช่องด้านบน = หน่วยของทุกไฟล์ในรหัสนี้ → ล้างข้อยกเว้นรายไฟล์ ('' = ใช้หน่วยของรหัส)
+        const ru = Object.assign({}, rep().recUnits || {});
+        monthRecords().forEach(function (r) { if (r.code === code && ru[r.__id]) ru[r.__id] = ''; });
+        run(function () { return saveReport({ units: u, recUnits: ru }); });
+      };
+    });
+    $$('[data-split]', p).forEach(function (b) {
+      b.onclick = function () {
+        const c = b.getAttribute('data-split');
+        splitOpen[c] = splitOpen[c] !== true;
+        renderWork();
       };
     });
     // หน่วยนับรายไฟล์ (เก็บเป็นค่าเสมอ เพื่อให้เขียนทับแบบ merge ได้)
@@ -840,16 +862,6 @@
         const ru = Object.assign({}, rep().recUnits || {});
         ru[inp.getAttribute('data-recunit')] = inp.value.trim();
         run(function () { return saveReport({ recUnits: ru }); });
-      };
-    });
-    $$('[data-allunit]', p).forEach(function (sel) {
-      sel.onchange = function () {
-        if (!sel.value) return;
-        const a = shown.find(function (x) { return x.code === sel.getAttribute('data-allunit'); });
-        if (!a) return;
-        const ru = Object.assign({}, rep().recUnits || {});
-        a.records.forEach(function (r) { if (unitChoices(r.code).indexOf(sel.value) >= 0) ru[r.__id] = sel.value; });
-        run(function () { return saveReport({ recUnits: ru }); }, 'ตั้งหน่วยนับทุกไฟล์แล้ว');
       };
     });
   }
