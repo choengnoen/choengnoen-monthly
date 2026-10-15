@@ -1065,7 +1065,9 @@
       '<p class="small muted">ถ้าเริ่มใช้ระบบกลางปีงบ ให้เลือกเดือนสุดท้ายที่ยังไม่ได้นำเข้า CSV แล้วกรอก "ผลสะสมยกมา" รายกลุ่ม (จากระบบของแขวง) — เดือนหลังจากนั้นระบบคำนวณจาก CSV ที่นำเข้าเอง</p></div></div></div>' +
       // ตัวอย่าง 3 หน้าเรียงบนลงล่าง (ตามลำดับในไฟล์ PowerPoint) — ภาพใหญ่ ตรวจง่าย
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 1: สรุปผลงานบำรุงปกติ ประจำเดือน</h3><div id="planPrev0"></div></div>' +
-      '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 2: แผน-ผล ตามรหัสงาน</h3><div id="planPrev1"></div></div>' +
+      '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 2: แผน-ผล ตามรหัสงาน</h3><div id="planPrev1"></div>' +
+      '<div style="margin-top:12px"><button class="btn btn-pmgr" id="planBannerBtn" title="เปลี่ยนรูปแบนเนอร์ด้านล่างของหน้านี้ และเลือกจุดกึ่งกลางของรูป (ลบรูปที่เลือก = กลับไปใช้รูปเดิมของระบบ)">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน' + (photosOf('planbanner').length ? ' (เปลี่ยนรูปแล้ว)' : '') + '</button>' +
+      '<span class="small muted" style="margin-left:10px">เปลี่ยนรูปแถบด้านล่างของหน้านี้ (ใช้รูปแนวนอน)</span></div></div>' +
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 3: ความก้าวหน้าการใช้งบประมาณ</h3><div id="planPrev2"></div>' +
       budgetBoxHtml(cum) +
       '</div>';
