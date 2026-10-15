@@ -492,7 +492,8 @@
   }
   function canSave(x) { return x.level === 'ok' || x.level === 'info' || (x.level === 'warn' && x.confirmed === true); }
   // ย่อรายการวันที่: วันติดกันรวมเป็นช่วง ชื่อเดือนแสดงครั้งเดียว เช่น "(14 วัน) 1, 3–8, 10–15 ส.ค."
-  function compactDates(dates) {
+  // inline = true → บรรทัดเดียวพร้อมปี พ.ศ. 2 หลัก เช่น "2 วัน : 30-31 ส.ค. 69"
+  function compactDates(dates, inline) {
     const ds = dates.slice().sort();
     const parts = [];
     let i = 0;
@@ -503,11 +504,12 @@
       for (let j = 0; j < grp.length; j++) {
         let k = j;
         while (k + 1 < grp.length && grp[k + 1] === grp[k] + 1) k++;
-        rs.push(k > j ? grp[j] + '–' + grp[k] : String(grp[j]));
+        rs.push(k > j ? grp[j] + (inline ? '-' : '–') + grp[k] : String(grp[j]));
         j = k;
       }
-      parts.push(rs.join(', ') + ' ' + RE.MONTHS_SHORT[Number(ym.slice(5, 7)) - 1]);
+      parts.push(rs.join(', ') + ' ' + RE.MONTHS_SHORT[Number(ym.slice(5, 7)) - 1] + (inline ? ' ' + String((Number(ym.slice(0, 4)) + 543) % 100).padStart(2, '0') : ''));
     }
+    if (inline) return '<b>' + ds.length + ' วัน</b> : ' + esc(parts.join(' · '));
     return '<span class="dchip">' + ds.length + ' วัน</span><br>' + esc(parts.join(' · '));
   }
   function bindPending(p) {
@@ -749,7 +751,7 @@
     h += '<div class="ru-list">';
     recs.forEach(function (r) {
       h += '<div class="ru-row" title="' + esc(r.file) + '">' +
-        '<div class="ru-date">' + (a.merged ? '<span class="ru-code">' + esc(r.code) + '</span>' : '') + compactDates(r.dates) + '</div>' +
+        '<div class="ru-date">' + (a.merged ? '<span class="ru-code">' + esc(r.code) + '</span>' : '') + compactDates(r.dates, true) + '</div>' +
         '<div class="ru-qty">' + RE.fmtQty(r.qty) + '</div><div class="ru-sel">' + recUnitFieldHtml(r) + '</div>' +
         '<div class="ru-route">ทล.' + esc(r.route) + ' กม. ' + esc(r.kmFrom) + '–' + esc(r.kmTo) + '</div></div>';
     });
