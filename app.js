@@ -1409,15 +1409,23 @@
     const byMonth = {};
     S.photos.forEach(function (x) { const m = byMonth[x.mk] = byMonth[x.mk] || { n: 0, size: 0 }; m.n++; m.size += x.size || 0; });
     h += trashCardHtml();
+    let totN = 0, totSize = 0;
+    Object.keys(byMonth).forEach(function (m) { totN += byMonth[m].n; totSize += byMonth[m].size; });
+    const routeN = window.CNMaster && CNMaster.routes ? CNMaster.routes().length : 0;
     h += '<div class="set-row"><div class="card"><div class="section-title">🖼 พื้นที่เก็บรูปชั่วคราว</div>' +
-      (Object.keys(byMonth).length ? '<table class="tbl" style="max-width:520px"><tr><th>เดือน</th><th class="num">รูป</th><th class="num">ขนาด</th><th></th></tr>' + Object.keys(byMonth).sort().map(function (m) {
+      '<div class="set-stats"><div><div class="n">' + totN + '<small>รูป</small></div><div class="l">รูปทั้งหมด</div></div>' +
+      '<div><div class="n">' + RE.fmt(totSize / 1048576, 1) + '<small>MB</small></div><div class="l">ขนาดรวม</div></div></div>' +
+      (Object.keys(byMonth).length ? '<table class="tbl set-tbl"><tr><th>เดือน</th><th class="num">รูป</th><th class="num">ขนาด</th><th></th></tr>' + Object.keys(byMonth).sort().map(function (m) {
         return '<tr><td>' + esc(RE.mkLabel(m)) + '</td><td class="num">' + byMonth[m].n + '</td><td class="num">' + RE.fmt(byMonth[m].size / 1048576, 1) + ' MB</td><td>' + (m === S.mk ? '<span class="small muted">เดือนปัจจุบัน</span>' : (FBL.isPrivileged() ? '<button class="btn btn-sm btn-danger" data-clr="' + m + '">ลบ</button>' : '')) + '</td></tr>';
       }).join('') + '</table>' : '<p class="set-hint">ไม่มีรูปในระบบ</p>') +
-      (FBL.photoStore === 'drive'
-        ? '<p class="set-hint" style="margin-top:10px">ตัวรูปเก็บใน Google Drive (โฟลเดอร์ "ระบบรายงานประจำเดือน - รูปภาพ" แยกตามเดือน) — ลบแล้วอยู่ในถังขยะของ Drive กู้คืนได้ 30 วัน</p></div>'
-        : '<p class="set-hint" style="margin-top:10px">Firebase แผนฟรีเก็บข้อมูลได้ 1 GB — รูปเดือนละ ~50 รูป ใช้ประมาณ 25–40 MB</p></div>');
-    h += '<div class="card"><div class="section-title">เกี่ยวกับระบบ</div><div class="set-hint" style="line-height:1.7">รายงานประจำเดือน หมวดทางหลวงเชิงเนิน · รุ่น 1.0 (26 ก.ย. 2569)<br>' +
-      'ฐานข้อมูล: ' + (FBL.demo ? '<b>โหมดทดลอง (เก็บในเครื่องนี้)</b>' : 'Firebase Firestore') + ' · ที่เก็บรูป: ' + (FBL.photoStore === 'drive' ? 'Google Drive' : 'Firestore') + ' · สายทางจากฐานข้อมูลกลาง CN-Hub: ' + (window.CNMaster && CNMaster.routes && CNMaster.routes().length ? 'เชื่อมต่อแล้ว (' + CNMaster.routes().length + ' สาย)' : 'ยังไม่เชื่อมต่อ — ใช้ชื่อตอนสำรอง') + '</div></div></div>';
+      (FBL.photoStore === 'drive' ? '' : '<p class="set-hint" style="margin-top:10px">Firebase แผนฟรีเก็บข้อมูลได้ 1 GB — รูปเดือนละ ~50 รูป ใช้ประมาณ 25–40 MB</p>') + '</div>';
+    h += '<div class="card"><div class="section-title">ℹ️ เกี่ยวกับระบบ</div><dl class="set-kv">' +
+      '<dt>ระบบ</dt><dd>รายงานประจำเดือน หมวดทางหลวงเชิงเนิน</dd>' +
+      '<dt>รุ่น</dt><dd>1.0 <span class="set-hint">(26 ก.ย. 2569)</span></dd>' +
+      '<dt>ฐานข้อมูล</dt><dd>' + (FBL.demo ? '<b>โหมดทดลอง (เก็บในเครื่องนี้)</b>' : 'Firebase Firestore') + '</dd>' +
+      '<dt>ที่เก็บรูป</dt><dd>' + (FBL.photoStore === 'drive' ? 'Google Drive' : 'Firestore') + '</dd>' +
+      '<dt>สายทาง</dt><dd>' + (routeN ? '<span class="set-dot"></span>จากฐานข้อมูลกลาง CN-Hub · เชื่อมต่อแล้ว (' + routeN + ' สาย)' : 'ยังไม่เชื่อมต่อ CN-Hub — ใช้ชื่อตอนสำรอง') + '</dd>' +
+      '</dl></div></div>';
     p.innerHTML = h;
     renderDirNotice();
     const btnTrash = $('#btnOpenTrash');
