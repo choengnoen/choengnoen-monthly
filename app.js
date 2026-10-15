@@ -507,7 +507,7 @@
         rs.push(k > j ? grp[j] + (inline ? '-' : '–') + grp[k] : String(grp[j]));
         j = k;
       }
-      parts.push(rs.join(', ') + ' ' + RE.MONTHS_SHORT[Number(ym.slice(5, 7)) - 1] + (inline ? ' ' + String((Number(ym.slice(0, 4)) + 543) % 100).padStart(2, '0') : ''));
+      parts.push(rs.join(', ') + ' ' + RE.MONTHS_SHORT[Number(ym.slice(5, 7)) - 1] + (inline ? ' ' + String((Number(ym.slice(0, 4)) + (Number(ym.slice(0, 4)) > 2400 ? 0 : 543)) % 100).padStart(2, '0') : ''));
     }
     if (inline) return '<b>' + ds.length + ' วัน</b> : ' + esc(parts.join(' · '));
     return '<span class="dchip">' + ds.length + ' วัน</span><br>' + esc(parts.join(' · '));
