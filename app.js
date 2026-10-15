@@ -122,7 +122,7 @@
     return '<div class="el-text" style="' + pos(e) + st + '"><div style="text-align:' + (e.align || 'left') + ';width:100%">' + inner + '</div></div>';
   }
   function photoBg(url, pw, ph, e) {
-    const c = RE.cropRect(pw, ph, e.w / e.h, e.fx, e.fy);
+    const c = RE.cropRect(pw, ph, e.w / e.h, e.fx, e.fy, e.ct);
     const bx = c.sw >= 0.9999 ? 0 : c.sx / (1 - c.sw) * 100, by = c.sh >= 0.9999 ? 0 : c.sy / (1 - c.sh) * 100;
     return 'background-image:url(' + url + ');background-size:' + (100 / c.sw) + '% ' + (100 / c.sh) + '%;background-position:' + bx + '% ' + by + '%;';
   }
@@ -896,7 +896,6 @@
         '<button class="btn btn-sm btn-danger" data-delprob="' + pr.id + '">ลบเรื่องนี้</button></div>' +
         '<div class="pf-head"><div><label class="f">ประเภท</label><select data-pf="kind">' + RE.PROBLEM_KINDS.map(function (k) { return '<option' + (k === pr.kind ? ' selected' : '') + '>' + k + '</option>'; }).join('') + '</select></div>' +
         '<div><label class="f">สายทาง</label><select data-pf="routeSel">' + routeOptions(pr.route ? pr.route + '|' + (pr.ctrl || '') : '') + '</select></div>' +
-        '<div><label class="f">ชื่อตอน (อัตโนมัติ แก้ได้)</label><input type="text" data-pf="section" value="' + esc(pr.section || '') + '"></div>' +
         '<div><label class="f">หัวเรื่อง (ว่าง = ตามประเภท)</label><input type="text" data-pf="title" placeholder="' + esc(RE.problemTitles(Object.assign({}, pr, { title: '' }))[0]) + '" value="' + esc(pr.title || '') + '"></div></div>';
       (pr.points || []).forEach(function (pt, k) {
         const slot = 'prob:' + pr.id + ':' + pt.id;
@@ -956,6 +955,25 @@
     // แก้ไขช่องต่าง ๆ: เก็บร่างไว้ในเครื่อง อัปเดตตัวอย่างทันที แล้วบันทึกเมื่อหยุดพิมพ์
     p.addEventListener('input', onProbField);
     p.addEventListener('change', onProbField);
+    // คลิกสไลด์ตัวอย่าง → แสดงแบบใหญ่ (คลิกอีกครั้ง/กด Esc เพื่อปิด)
+    if (!p.__zoomBound) {
+      p.__zoomBound = true;
+      p.addEventListener('click', function (ev) {
+        const sl = ev.target.closest && ev.target.closest('details.prev .slide');
+        if (sl) zoomSlide(sl);
+      });
+    }
+  }
+  function zoomSlide(sl) {
+    const ov = document.createElement('div');
+    ov.className = 'slide-zoom';
+    ov.innerHTML = '<span class="zx" aria-hidden="true">✕</span>';
+    ov.appendChild(sl.cloneNode(true));
+    const close = function () { ov.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = function (e) { if (e.key === 'Escape') close(); };
+    ov.onclick = close;
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(ov);
   }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function onProbField(ev) {
@@ -971,7 +989,6 @@
         const parts = el.value.split('|');
         pr.route = parts[0] || ''; pr.ctrl = parts[1] || '';
         pr.section = pr.route ? RE.sectionName(pr.route, pr.ctrl, null) : '';
-        const sec = $('[data-pf="section"]', box); if (sec) sec.value = pr.section;
       } else pr[f] = el.value;
     } else {
       const pt = pr.points.find(function (x) { return x.id === el.closest('[data-ptid]').getAttribute('data-ptid'); });
@@ -1054,7 +1071,9 @@
       '<p class="small muted" style="margin-top:12px">ข้อความใต้กราฟ: ยอดเงินแผน/ผล มาจากตาราง "แผนและผลตามกลุ่มงาน" ด้านบน · % แผน/ผลสะสม ระบบอ่านจากรูปกราฟให้ (แก้ได้)</p>' +
       '<div style="display:flex;gap:12px;flex-wrap:wrap">' +
       '<div><label class="f">% แผนสะสม (จากกราฟ)</label><input type="text" inputmode="decimal" id="budgetPctPlan" style="width:140px" value="' + esc(budgetPct().plan) + '"></div>' +
-      '<div><label class="f">% ผลสะสม (จากกราฟ)</label><input type="text" inputmode="decimal" id="budgetPctResult" style="width:140px" value="' + esc(budgetPct().result) + '"></div></div>' +
+      '<div><label class="f">% ผลสะสม (จากกราฟ)</label><input type="text" inputmode="decimal" id="budgetPctResult" style="width:140px" value="' + esc(budgetPct().result) + '"></div>' +
+      '<div><label class="f">ตัดชื่อกราฟบนรูปออก (% ของความสูงรูป)</label><input type="text" inputmode="decimal" id="budgetCropTop" style="width:140px" value="' + esc(budgetPct().cropTop) + '"></div></div>' +
+      '<p class="small" id="budgetDiffHint" style="margin-top:10px;font-weight:600">' + esc(budgetDiffHint()) + '</p>' +
       '</div>';
     p.innerHTML = h;
     bindThumbs(p);
@@ -1062,6 +1081,7 @@
     const savePct = debounce(function () { run(function () { return saveReport({ budgetPct: budgetPct() }); }); }, 700);
     $('#budgetPctPlan').addEventListener('input', savePct);
     $('#budgetPctResult').addEventListener('input', savePct);
+    $('#budgetCropTop').addEventListener('input', savePct);
     renderPlanPreview();
     p.oninput = function () { renderPlanPreview(); };
     $('#carryMk').onchange = function () {
@@ -1109,7 +1129,15 @@
   function budgetPct() {
     const r = rep().budgetPct || {};
     const val = function (id, v) { return $(id) ? $(id).value.replace(/[,%\s]/g, '') : (v == null ? '' : String(v)); };
-    return { plan: val('#budgetPctPlan', r.plan), result: val('#budgetPctResult', r.result) };
+    return { plan: val('#budgetPctPlan', r.plan), result: val('#budgetPctResult', r.result), cropTop: val('#budgetCropTop', r.cropTop == null ? '10' : r.cropTop) };
+  }
+  // บรรทัดสรุปส่วนต่าง แผน-ผล ใต้ช่องกรอก % (ให้เห็นก่อนส่งออก)
+  function budgetDiffHint() {
+    const p = budgetPct(), a = parseFloat(p.plan), b = parseFloat(p.result);
+    if (!isFinite(a) || !isFinite(b)) return 'กรอก % แผนสะสม และ % ผลสะสม ทั้งสองช่อง ระบบจึงจะแสดงส่วนต่างแผน-ผลใต้กราฟ';
+    const d = Math.round((b - a) * 100) / 100;
+    if (d === 0) return 'ส่วนต่าง: ผลเท่ากับแผน';
+    return 'ส่วนต่าง: ผล' + (d > 0 ? 'มากกว่า' : 'น้อยกว่า') + 'แผน ' + RE.fmt(Math.abs(d)) + ' %';
   }
   // ใส่รูปกราฟ: บันทึกรูป + อ่าน % แผน/ผลจากรูปแล้วกรอก 2 บรรทัดให้ (อ่านจากไฟล์ต้นฉบับที่คมกว่ารูปที่ย่อแล้ว)
   function addBudgetImage(files) {
@@ -1120,7 +1148,7 @@
     RE.readBudgetChart(f).then(function (v) {
       t.remove();
       if (!v) { toast('อ่านตัวเลข % แผน/ผล จากรูปไม่ได้ — พิมพ์ 2 บรรทัดใต้กราฟเองได้', 'err', 7000); return; }
-      const pv = { plan: RE.fmt(v.plan).replace(/,/g, ''), result: RE.fmt(v.result).replace(/,/g, '') };
+      const pv = { plan: RE.fmt(v.plan).replace(/,/g, ''), result: RE.fmt(v.result).replace(/,/g, ''), cropTop: budgetPct().cropTop };
       if ($('#budgetPctPlan')) { $('#budgetPctPlan').value = pv.plan; $('#budgetPctResult').value = pv.result; renderPlanPreview(); }
       return saveReport({ budgetPct: pv }).then(function () {
         toast('อ่านได้: แผน ' + RE.fmt(v.plan) + '% · ผล ' + RE.fmt(v.result) + '% — ตรวจตัวเลขเทียบกับรูปอีกครั้ง', 'ok', 7000);
@@ -1141,6 +1169,7 @@
     }
     if ($('#planPrev1')) $('#planPrev1').innerHTML = slideHtml(RE.slidePlan(S.mk, plan, cum));
     if ($('#planPrev2')) $('#planPrev2').innerHTML = slideHtml(RE.slideBudget(S.mk, plan, cum, budgetImg(), budgetPct()));
+    if ($('#budgetDiffHint')) $('#budgetDiffHint').textContent = budgetDiffHint();
   }
 
   /* ======================================================================

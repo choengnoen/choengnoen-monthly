@@ -583,21 +583,24 @@
   };
 
   // พื้นที่ครอปของรูป (สัดส่วน 0..1) ให้พอดีกรอบ โดยให้จุดสำคัญอยู่กลางกรอบมากที่สุด
-  RE.cropRect = function (pw, ph, cellAspect, fx, fy) {
-    const pa = pw / ph;
+  // ct = สัดส่วนที่ตัดทิ้งจากขอบบนของรูป (0..0.4) เช่น ตัดชื่อกราฟที่ติดมากับรูปแคป — ไม่ใส่ = ไม่ตัด
+  RE.cropRect = function (pw, ph, cellAspect, fx, fy, ct) {
+    const top = ct > 0 && ct < 0.5 ? ct : 0, rh = 1 - top;
+    const pa = pw / (ph * rh);
     let sw = 1, sh = 1;
     if (pa > cellAspect) sw = cellAspect / pa; else sh = pa / cellAspect;
     const cx = fx == null ? 0.5 : fx, cy = fy == null ? 0.5 : fy;
     const sx = Math.min(Math.max(cx - sw / 2, 0), 1 - sw);
-    const sy = Math.min(Math.max(cy - sh / 2, 0), 1 - sh);
-    return { sx: sx, sy: sy, sw: sw, sh: sh };
+    const shA = sh * rh;   // ความสูงจริงเทียบทั้งรูป
+    const sy = Math.min(Math.max(cy - shA / 2, top), 1 - shA);
+    return { sx: sx, sy: sy, sw: sw, sh: shA };
   };
 
   // ครอปรูปจริงสำหรับใส่ในไฟล์ PowerPoint (ความละเอียดสูงสุดไม่เกิน ~220 จุด/นิ้วของกรอบ)
   // soft = ความกว้างขอบเบลอ (นิ้ว) — ไล่ขอบรูปเป็นสีขาวแบบ "ขอบนุ่ม" ของต้นฉบับ (พื้นหลังใต้รูปเป็นสีขาว จึงยังเป็น JPEG ได้)
-  RE.cropForSlide = async function (bytes, cellWIn, cellHIn, fx, fy, soft) {
+  RE.cropForSlide = async function (bytes, cellWIn, cellHIn, fx, fy, soft, ct) {
     const img = await decode(bytes);
-    const c = RE.cropRect(img.width, img.height, cellWIn / cellHIn, fx, fy);
+    const c = RE.cropRect(img.width, img.height, cellWIn / cellHIn, fx, fy, ct);
     const sw = c.sw * img.width, sh = c.sh * img.height;
     const outW = Math.round(Math.min(sw, cellWIn * 220));
     const outH = Math.round(outW * sh / sw);
@@ -937,10 +940,13 @@
     const els = [{ type: 'bg', src: A('frame-budget.jpg') }];
     els.push({ type: 'text', x: 2.4, y: TITLE_Y, w: 17.3, h: 1.3, text: 'กราฟแสดงความก้าวหน้า\nการใช้งบประมาณบำรุงปกติ', size: 26, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.3 });
     const box = { x: 3.1, y: 2.25, w: 15.9, h: 6.55 };
+    // ตัดแถบชื่อกราฟที่ติดมากับรูปแคปออก (สไลด์มีชื่อกราฟของตัวเองอยู่แล้ว) — ค่าเริ่มต้น 10% ของความสูงรูป, ใส่ 0 = ไม่ตัด
+    const ctRaw = pct && pct.cropTop !== '' && pct.cropTop != null ? Number(pct.cropTop) : 10;
+    const ct = isFinite(ctRaw) && ctRaw > 0 ? Math.min(ctRaw, 40) / 100 : 0;
     if (img && img.w && img.h) {
-      const ar = img.w / img.h;
+      const ar = img.w / (img.h * (1 - ct));
       const w = ar > box.w / box.h ? box.w : box.h * ar, h = w / ar;
-      els.push({ type: 'photo', id: img.id, pw: img.w, ph: img.h, fx: 0.5, fy: 0.5, x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w: w, h: h });
+      els.push({ type: 'photo', id: img.id, pw: img.w, ph: img.h, fx: 0.5, fy: 0.5, ct: ct, x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w: w, h: h });
     } else {
       els.push({ type: 'rect', x: box.x, y: box.y, w: box.w, h: box.h, fill: 'F4F6FA', line: 'BBBBBB', lineW: 0.75, text: 'ยังไม่ได้ใส่รูปกราฟ (แท็บ ④ แผน-ผล → เพิ่มรูปกราฟ)', size: 18, color: '888888' });
     }
@@ -958,7 +964,10 @@
       const d = Math.round((pR - pP) * 100) / 100;
       tail2.push({ text: '( ', color: BLK }, { text: 'ผล', bold: true, color: BLK },
         { text: d >= 0 ? 'มากกว่า' : 'น้อยกว่า', bold: true, color: RED }, { text: 'แผน ', bold: true, color: BLK },
-        { text: RE.fmt(Math.abs(d)), bold: true, color: RED }, { text: ' % )', color: BLK });
+        { text: RE.fmt(Math.abs(d)), bold: true, color: RED }, { text: ' %', bold: true, color: RED });
+      // ส่วนต่างเป็นเงิน = % ส่วนต่าง × งบทั้งปี (แผนรวม)
+      if (cum.planTotal) tail2.push({ text: '  คิดเป็นเงิน ', color: BLK }, { text: RE.fmt(Math.abs(d) / 100 * cum.planTotal), bold: true, color: RED }, { text: ' บาท', color: BLK });
+      tail2.push({ text: ' )', color: BLK });
     }
     const rowsB = [
       ['แผนงานบำรุงปกติ', RE.fmt(cum.planTotal || 0), 'บาท', 'คิดเป็น', '100.00 %', [{ text: 'ของงบประมาณที่ได้รับ', color: BLK }]],
@@ -1046,7 +1055,11 @@
     const t1 = pr.title || (pr.kind === 'อุทกภัย' ? 'รายงานปัญหา อุปสรรค'
       : pr.kind && pr.kind !== 'อื่น ๆ' ? 'รายงานปัญหา ' + pr.kind : 'รายงานปัญหา อุปสรรค');
     let t2 = '';
-    if (pr.route) t2 = 'ทางหลวงหมายเลข ' + pr.route + (pr.section ? ' ตอน ' + pr.section : '');
+    if (pr.route) {
+      // ชื่อตอนดึงจากช่องสายทางเสมอ (ไม่ใช้ค่าที่เคยพิมพ์เก็บไว้)
+      const sec = RE.sectionName(pr.route, pr.ctrl || '', null);
+      t2 = 'ทางหลวงหมายเลข ' + pr.route + (sec ? ' ตอน ' + sec : '');
+    }
     return [t1, t2];
   };
   function m2(v) { const n = Number(v); return v === '' || v == null || !isFinite(n) ? '' : RE.fmt(n, 2); }
@@ -1160,7 +1173,7 @@
           s.addImage({ data: data, x: e.x, y: e.y, w: e.w, h: e.h });
         } else if (e.type === 'photo') {
           const bytes = await getPhotoBytes(e.id);
-          const data = await RE.cropForSlide(bytes, e.w, e.h, e.fx, e.fy, e.soft);
+          const data = await RE.cropForSlide(bytes, e.w, e.h, e.fx, e.fy, e.soft, e.ct);
           s.addImage({ data: data, x: e.x, y: e.y, w: e.w, h: e.h });
         } else if (e.type === 'softbox') {
           s.addImage({ data: RE.softBoxPng(e.w, e.h, e.blur, e.opacity), x: e.x, y: e.y, w: e.w, h: e.h });
