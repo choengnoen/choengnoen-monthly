@@ -403,7 +403,11 @@ table.pend tr.skip td:last-child{opacity:1}
 .pt{border-top:1px dashed var(--line);padding-top:8px;margin-top:8px}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
 .fgrid .w2{grid-column:span 2}
-.pf-head{display:grid;grid-template-columns:110px 1.5fr 1fr 1.5fr;gap:8px}
+.pf-head{display:grid;grid-template-columns:110px 1.5fr 1.5fr;gap:8px}
+details.prev .slide{cursor:zoom-in}
+.slide-zoom{position:fixed;inset:0;z-index:9999;background:rgba(7,27,48,.82);display:grid;place-items:center;padding:24px;cursor:zoom-out}
+.slide-zoom .slide{width:min(96vw,calc((100vh - 48px) * 20 / 11.25));cursor:zoom-out}
+.slide-zoom .zx{position:absolute;top:14px;right:18px;color:#fff;font-size:30px;line-height:1}
 .pf-pt{display:grid;grid-template-columns:30px 1fr 30px;gap:8px;align-items:start}
 .pf-pt .pt-no,.pf-pt .pt-del{margin-top:22px}
 .pf-text textarea{width:100%;resize:vertical;min-height:84px;font:inherit;line-height:1.5;white-space:pre-wrap}
