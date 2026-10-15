@@ -1066,8 +1066,7 @@
       // ตัวอย่าง 3 หน้าเรียงบนลงล่าง (ตามลำดับในไฟล์ PowerPoint) — ภาพใหญ่ ตรวจง่าย
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 1: สรุปผลงานบำรุงปกติ ประจำเดือน</h3><div id="planPrev0"></div></div>' +
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 2: แผน-ผล ตามรหัสงาน</h3><div id="planPrev1"></div>' +
-      '<div style="margin-top:12px"><button class="btn btn-pmgr" id="planBannerBtn" title="เปลี่ยนรูปแบนเนอร์ด้านล่างของหน้านี้ และเลือกจุดกึ่งกลางของรูป (ลบรูปที่เลือก = กลับไปใช้รูปเดิมของระบบ)">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน' + (photosOf('planbanner').length ? ' (เปลี่ยนรูปแล้ว)' : '') + '</button>' +
-      '<span class="small muted" style="margin-left:10px">เปลี่ยนรูปแถบด้านล่างของหน้านี้ (ใช้รูปแนวนอน)</span></div></div>' +
+      '<div style="margin-top:12px"><button class="btn btn-pmgr" id="planBannerBtn" title="เปลี่ยนรูปแบนเนอร์ด้านล่างของหน้านี้ และเลือกจุดกึ่งกลางของรูป (ลบรูปที่เลือก = กลับไปใช้รูปเดิมของระบบ)">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน' + (photosOf('planbanner').length ? ' (เปลี่ยนรูปแล้ว)' : '') + '</button></div></div>' +
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 3: ความก้าวหน้าการใช้งบประมาณ</h3><div id="planPrev2"></div>' +
       budgetBoxHtml(cum) +
       '</div>';
@@ -1077,7 +1076,6 @@
     const savePct = debounce(function () { run(function () { return saveReport({ budgetPct: budgetPct() }); }); }, 700);
     $('#budgetPctPlan').addEventListener('input', savePct);
     $('#budgetPctResult').addEventListener('input', savePct);
-    $('#budgetCropTop').addEventListener('input', savePct);
     renderPlanPreview();
     p.oninput = function () { renderPlanPreview(); };
     $('#carryMk').onchange = function () {
@@ -1126,7 +1124,7 @@
   function budgetPct() {
     const r = rep().budgetPct || {};
     const val = function (id, v) { return $(id) ? $(id).value.replace(/[,%\s]/g, '') : (v == null ? '' : String(v)); };
-    return { plan: val('#budgetPctPlan', r.plan), result: val('#budgetPctResult', r.result), cropTop: val('#budgetCropTop', r.cropTop == null ? '10' : r.cropTop) };
+    return { plan: val('#budgetPctPlan', r.plan), result: val('#budgetPctResult', r.result) };
   }
   // ส่วนต่าง แผน-ผล คำนวณอัตโนมัติจาก % ที่อ่านได้จากรูปกราฟ (แก้ค่าเองได้) → { title, sub, cls }
   function budgetDiffInfo(planTotal) {
@@ -1134,8 +1132,7 @@
     if (!isFinite(a) || !isFinite(b)) return { title: 'รออ่านค่าจากรูป', sub: 'แนบรูปกราฟแล้วระบบจะคำนวณให้เอง', cls: '' };
     const d = Math.round((b - a) * 100) / 100;
     if (d === 0) return { title: 'ผลเท่ากับแผน', sub: '', cls: 'eq' };
-    return { title: 'ผล' + (d > 0 ? 'มากกว่า' : 'น้อยกว่า') + 'แผน ' + RE.fmt(Math.abs(d)) + ' %',
-      sub: planTotal ? 'คิดเป็นเงิน ' + RE.fmt(Math.abs(d) / 100 * planTotal) + ' บาท' : '', cls: d > 0 ? 'up' : 'down' };
+    return { title: 'ผล' + (d > 0 ? 'มากกว่า' : 'น้อยกว่า') + 'แผน ' + RE.fmt(Math.abs(d)) + ' %', sub: '', cls: d > 0 ? 'up' : 'down' };
   }
   function budgetDiffHtml(planTotal) {
     const i = budgetDiffInfo(planTotal);
@@ -1148,14 +1145,12 @@
       '<div class="bud-head"><button class="btn btn-pmgr" id="budPick" title="แนบรูปกราฟ (รูปใหม่จะแทนรูปเดิม) หรือลากรูปมาวางในกรอบนี้">' + PHOTO_EDIT_ICON + 'แนบภาพรายงาน</button>' +
       (has ? '<span class="pill ok">แนบรูปแล้ว' + (b ? ' · ' + esc(b) : '') + '</span><button class="btn" id="budReread" title="อ่านตัวเลขจากรูปที่แนบไว้ใหม่อีกครั้ง">อ่านค่าจากรูปใหม่</button><button class="btn btn-danger" id="budRemove">ลบรูป</button>' : '') +
       '</div>' +
-      '<p class="small muted" style="margin:8px 0 12px">แคปกราฟจากระบบของกรมแล้วแนบ — ระบบอ่าน % แผน/ผลสะสมจากรูป แล้วคำนวณส่วนต่างให้อัตโนมัติ (ลากรูปมาวางในกรอบนี้ได้) · ยอดเงินแผน/ผลมาจากตารางด้านบน</p>' +
+      '<div style="height:12px"></div>' +
       '<div class="bud-tiles">' +
       '<div class="bud-tile"><label class="f">แผนสะสม</label><div class="bud-in"><input type="text" inputmode="decimal" id="budgetPctPlan" value="' + esc(budgetPct().plan) + '" placeholder="—"><i>%</i></div></div>' +
       '<div class="bud-tile"><label class="f">ผลสะสม</label><div class="bud-in"><input type="text" inputmode="decimal" id="budgetPctResult" value="' + esc(budgetPct().result) + '" placeholder="—"><i>%</i></div></div>' +
       '<div class="bud-tile bud-tile-diff"><label class="f">ส่วนต่าง แผน-ผล</label><div id="budDiff">' + budgetDiffHtml(cum && cum.planTotal) + '</div></div>' +
       '</div>' +
-      '<details class="small" style="margin-top:12px"><summary class="muted" style="cursor:pointer">ตั้งค่าเพิ่มเติม</summary>' +
-      '<div style="margin-top:8px"><label class="f">ตัดชื่อกราฟที่ติดมากับรูปออก (% ของความสูงรูป · 0 = ไม่ตัด)</label><input type="text" inputmode="decimal" id="budgetCropTop" style="width:140px" value="' + esc(budgetPct().cropTop) + '"></div></details>' +
       '</div>';
   }
   function photoMgrBudgetName() { const b = photosOf('budget')[0]; return b && b.name ? b.name : ''; }
@@ -1190,7 +1185,7 @@
     return RE.readBudgetChart(f).then(function (v) {
       t.remove();
       if (!v) { toast('อ่านตัวเลข % แผน/ผล จากรูปไม่ได้ — พิมพ์ในช่องแผนสะสม/ผลสะสมเองได้', 'err', 7000); return; }
-      const pv = { plan: RE.fmt(v.plan).replace(/,/g, ''), result: RE.fmt(v.result).replace(/,/g, ''), cropTop: budgetPct().cropTop };
+      const pv = { plan: RE.fmt(v.plan).replace(/,/g, ''), result: RE.fmt(v.result).replace(/,/g, '') };
       if ($('#budgetPctPlan')) { $('#budgetPctPlan').value = pv.plan; $('#budgetPctResult').value = pv.result; renderPlanPreview(); }
       return saveReport({ budgetPct: pv }).then(function () {
         toast('อ่านได้: แผน ' + RE.fmt(v.plan) + '% · ผล ' + RE.fmt(v.result) + '% · ' + budgetDiffInfo(0).title + ' — ตรวจเทียบกับรูปอีกครั้ง', 'ok', 8000);

@@ -943,13 +943,10 @@
     const els = [{ type: 'bg', src: A('frame-budget.jpg') }];
     els.push({ type: 'text', x: 2.4, y: TITLE_Y, w: 17.3, h: 1.3, text: 'กราฟแสดงความก้าวหน้า\nการใช้งบประมาณบำรุงปกติ', size: 26, bold: true, color: NAVY, align: 'center', valign: 'middle', lineSpacing: 1.3 });
     const box = { x: 3.1, y: 2.25, w: 15.9, h: 6.55 };
-    // ตัดแถบชื่อกราฟที่ติดมากับรูปแคปออก (สไลด์มีชื่อกราฟของตัวเองอยู่แล้ว) — ค่าเริ่มต้น 10% ของความสูงรูป, ใส่ 0 = ไม่ตัด
-    const ctRaw = pct && pct.cropTop !== '' && pct.cropTop != null ? Number(pct.cropTop) : 10;
-    const ct = isFinite(ctRaw) && ctRaw > 0 ? Math.min(ctRaw, 40) / 100 : 0;
     if (img && img.w && img.h) {
-      const ar = img.w / (img.h * (1 - ct));
+      const ar = img.w / img.h;
       const w = ar > box.w / box.h ? box.w : box.h * ar, h = w / ar;
-      els.push({ type: 'photo', id: img.id, pw: img.w, ph: img.h, fx: 0.5, fy: 0.5, ct: ct, x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w: w, h: h });
+      els.push({ type: 'photo', id: img.id, pw: img.w, ph: img.h, fx: 0.5, fy: 0.5, x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w: w, h: h });
     } else {
       els.push({ type: 'rect', x: box.x, y: box.y, w: box.w, h: box.h, fill: 'F4F6FA', line: 'BBBBBB', lineW: 0.75, text: 'ยังไม่ได้ใส่รูปกราฟ (แท็บ ④ แผน-ผล → เพิ่มรูปกราฟ)', size: 18, color: '888888' });
     }
@@ -968,8 +965,6 @@
       tail2.push({ text: '( ', color: BLK }, { text: 'ผล', bold: true, color: BLK },
         { text: d >= 0 ? 'มากกว่า' : 'น้อยกว่า', bold: true, color: RED }, { text: 'แผน ', bold: true, color: BLK },
         { text: RE.fmt(Math.abs(d)), bold: true, color: RED }, { text: ' %', bold: true, color: RED });
-      // ส่วนต่างเป็นเงิน = % ส่วนต่าง × งบทั้งปี (แผนรวม)
-      if (cum.planTotal) tail2.push({ text: '  คิดเป็นเงิน ', color: BLK }, { text: RE.fmt(Math.abs(d) / 100 * cum.planTotal), bold: true, color: RED }, { text: ' บาท', color: BLK });
       tail2.push({ text: ' )', color: BLK });
     }
     const rowsB = [
