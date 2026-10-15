@@ -119,7 +119,7 @@
       (e.bold ? 'font-weight:600;' : '') + (e.italic ? 'font-style:italic;' : '') + (e.lineSpacing ? 'line-height:' + (1.2 * e.lineSpacing) + ';' : '') +
       (e.lineSpacingPt ? 'line-height:' + fs(e.lineSpacingPt) + ';' : '') + (e.charSpacing ? 'letter-spacing:' + fs(e.charSpacing) + ';' : '') +
       (e.glow ? 'text-shadow:0 0 .5cqw #fff,0 0 1cqw #fff,0 0 1.6cqw #fff;' : '') + (e.wrap === false ? 'white-space:pre;' : '');
-    return '<div class="el-text" style="' + pos(e) + st + '"><div style="text-align:' + (e.align || 'left') + ';width:100%">' + inner + '</div></div>';
+    return '<div class="el-text' + (e.wrap === false ? ' nw' : '') + '" style="' + pos(e) + st + '"><div style="text-align:' + (e.align || 'left') + ';width:100%">' + inner + '</div></div>';
   }
   function photoBg(url, pw, ph, e) {
     const c = RE.cropRect(pw, ph, e.w / e.h, e.fx, e.fy, e.ct);
@@ -304,7 +304,15 @@
     $('#loginScreen').classList.remove('checking');
     $('#app').classList.remove('hidden');
     renderAll();
+    // iPad/Safari โหลดฟอนต์ Prompt ช้ากว่าคอม — ถ้าวัดความกว้างข้อความก่อนฟอนต์มา กล่องข้อความในสไลด์จะแคบเกินจนตัวอักษรท้ายบรรทัดถูกตัด
+    // โหลดฟอนต์ให้เสร็จก่อน แล้ววาดหน้าใหม่ 1 ครั้ง (ข้ามถ้าฟอนต์พร้อมแล้ว)
+    if (document.fonts && document.fonts.load && !fontsKicked) {
+      fontsKicked = true;
+      Promise.all(['400 16px Prompt', '600 16px Prompt', '600 16px Kanit', '400 16px Sarabun'].map(function (f) { return document.fonts.load(f, 'ทล.ก ม 0'); }))
+        .then(function () { if (started && !document.querySelector('.modal-bg')) renderAll(); }).catch(function () {});
+    }
   }
+  let fontsKicked = false;
 
   // ข้อมูลเปลี่ยนจากเครื่องอื่น: วาดใหม่ แต่ไม่วาดทับช่องที่กำลังพิมพ์อยู่
   const scheduleRender = debounce(function () {
@@ -726,7 +734,7 @@
     const all = [];
     recs.forEach(function (r) { unitChoices(r.code).forEach(function (u) { if (all.indexOf(u) < 0) all.push(u); }); });
     let h = '<div style="margin:12px 0 0"><label class="f">หน่วยนับแยกตามไฟล์' + (a.sameUnit ? '' : ' <span class="pill info">มี ' + a.qtyParts.length + ' หน่วยในเดือนนี้</span>') + '</label>' +
-      '<div class="tbl-wrap"><table class="tbl tbl-sum"><thead><tr><th>วันที่</th>' + (a.merged ? '<th>รหัส</th>' : '') + '<th>สายทาง / กม.</th><th class="num">ปริมาณ</th><th>หน่วย</th></tr></thead><tbody>';
+      '<div class="tbl-wrap"><table class="tbl tbl-sum tbl-units"><thead><tr><th>วันที่</th>' + (a.merged ? '<th>รหัส</th>' : '') + '<th>สายทาง / กม.</th><th class="num">ปริมาณ</th><th>หน่วย</th></tr></thead><tbody>';
     recs.forEach(function (r) {
       h += '<tr title="' + esc(r.file) + '"><td class="small">' + compactDates(r.dates) + '</td>' + (a.merged ? '<td>' + esc(r.code) + '</td>' : '') +
         '<td class="small">ทล.' + esc(r.route) + ' <span class="km muted">กม. ' + esc(r.kmFrom) + '–' + esc(r.kmTo) + '</span></td>' +

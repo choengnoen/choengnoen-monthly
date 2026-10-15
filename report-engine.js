@@ -762,7 +762,7 @@
   function textWidthIn(s, sizePt) {
     try {
       if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
-      measureCtx.font = '100px Prompt, sans-serif';
+      measureCtx.font = '100px Prompt, "Noto Sans Thai", "Thonburi", sans-serif';
       return measureCtx.measureText(String(s)).width / 100 * sizePt / 72;
     } catch (e) {
       return String(s).replace(/[ัิ-ฺ็-๎]/g, '').length * 0.5 * sizePt / 72;
@@ -808,7 +808,7 @@
       const widest = part.reduce(function (m, t) { return Math.max(m, textWidthIn(t, size)); }, 0);
       // เผื่อความกว้าง ~10% — ค่าที่วัดได้อาจแคบกว่าที่แสดงจริง (ฟอนต์ยังโหลดไม่เสร็จ / PowerPoint วาดกว้างกว่า)
       // ไม่งั้นท้ายบรรทัด เช่น " )" จะถูกตัดหาย — กล่องชิดซ้าย จึงขยายไปทางขวาได้โดยตัวอักษรไม่เลื่อน
-      const bw = Math.min(colW, widest * 1.1 + 0.3);
+      const bw = Math.min(colW, widest * 1.15 + 0.4);
       const bx = x0 + (colW - Math.min(colW, widest + 0.1)) / 2;
       part.forEach(function (t, i) {
         els.push({ type: 'text', x: bx, y: bandY + i * rowH, w: bw, h: rowH, text: t, size: size, color: INK, align: 'left', valign: 'middle', inset: 0, wrap: false });

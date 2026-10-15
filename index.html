@@ -34,6 +34,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{font-family:'Sarabun',system-ui,sans-serif;font-size:15px;color:var(--ink);background:var(--paper);line-height:1.5}
 h1,h2,h3{font-family:'Kanit',sans-serif;font-weight:600;margin:0;line-height:1.3}
 h2{font-size:20px} h3{font-size:17px}
@@ -156,6 +157,28 @@ main{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
 .unit-item{display:flex;align-items:center;gap:6px;min-width:0}
 .unit-item b{flex:none;width:48px}
 .unit-item input,.unit-item select,.unit-box input,.unit-box select{padding:3px 8px;font-size:13px;min-width:0;width:84px;flex:none}
+/* ช่องเลือกหน่วย: เว้นที่ให้ลูกศรของ iPad/Safari ไม่ให้ทับตัวอักษร และสูงพอให้ตัวอักษรไทย (สระ/วรรณยุกต์) ไม่ถูกตัด */
+.unit-item select,.unit-box select,table.tbl-units select{-webkit-appearance:none;appearance:none;padding-right:26px;line-height:1.5;min-height:34px;cursor:pointer;
+  background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238792a0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center}
+.unit-item input,.unit-box input,table.tbl-units input{line-height:1.5;min-height:34px}
+.unit-box select,.unit-box input{width:104px}
+/* ตาราง "หน่วยนับแยกตามไฟล์": ให้แต่ละคอลัมน์กว้างพอ ไม่บีบจนวันที่/สายทางตัดบรรทัดซ้อนกัน แคบมากให้เลื่อนข้างได้ */
+.work .tbl-wrap:has(.tbl-units){overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.tbl-units{table-layout:auto;min-width:380px;font-size:13px}
+table.tbl-units th,table.tbl-units td{padding-left:6px;padding-right:6px}
+table.tbl-units td:first-child{min-width:86px}
+table.tbl-units td:nth-child(2):not(.num){min-width:120px}
+table.tbl-units td.num{white-space:nowrap;text-align:right}
+table.tbl-units td:last-child{width:1%;white-space:nowrap}
+table.tbl-units select,table.tbl-units input{width:100px;min-width:0}
+table.tbl-units .km{display:inline-block;white-space:nowrap}
+/* จอสัมผัส (iPad): ช่องกรอก/เลือกขนาด 16px กันหน้าเว็บซูมเองเวลาแตะ และปุ่มแตะง่ายขึ้น */
+@media (pointer:coarse){
+  input[type=text],input[type=password],input[type=number],select,textarea{font-size:16px}
+  .unit-item select,.unit-box select,table.tbl-units select,.unit-item input,.unit-box input,table.tbl-units input{font-size:16px;min-height:40px}
+  .btn{min-height:40px}
+  .btn-sm{min-height:36px}
+}
 .empty{padding:40px 20px;text-align:center;color:var(--ink-soft)}
 .empty h2{margin-bottom:8px}
 
@@ -386,6 +409,8 @@ table.pend tr.skip td:last-child{opacity:1}
 .slide{position:relative;width:100%;aspect-ratio:20/11.25;background:#dfe7f1;overflow:hidden;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,.15);font-family:'Prompt',sans-serif;container-type:inline-size}
 .slide>*{position:absolute}
 .slide .el-text{display:flex;white-space:pre-wrap;overflow:hidden;line-height:1.25}
+/* บรรทัดที่ไม่ตัดคำ: ไม่ตัดท้ายข้อความทิ้งถ้าฟอนต์บนเครื่องนั้นกว้างกว่าที่วัดไว้เล็กน้อย */
+.slide .el-text.nw{overflow:visible}
 .slide .el-photo{background-repeat:no-repeat;background-color:#cfd8e3}
 .slide .el-ph{border:2px dashed #9fb3c8;display:grid;place-items:center;color:#6d8199;background:rgba(255,255,255,.55);font-family:'Sarabun'}
 .slide .el-chart{background:#fff}
@@ -403,7 +428,7 @@ table.pend tr.skip td:last-child{opacity:1}
 .slide .el-photo.sel{outline:3px solid var(--gold);z-index:3}
 
 /* งานรายรหัส */
-.work{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:18px;align-items:start}
+.work{display:grid;grid-template-columns:minmax(0,1fr) clamp(360px,36%,420px);gap:18px;align-items:start}
 .thumbs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:10px 0}
 .thumb{min-width:0;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff;font-size:12px}
 .thumb .im{aspect-ratio:4/3;background-size:cover;background-position:center;position:relative;cursor:crosshair}
@@ -469,7 +494,7 @@ details.prev .grid2{grid-template-columns:repeat(auto-fill,minmax(260px,320px));
 .progress{height:8px;background:var(--navy-100);border-radius:6px;overflow:hidden}
 .progress>div{height:100%;background:var(--blue);transition:width .2s}
 .check li{margin:4px 0}
-@media (max-width:1000px){.work,.grid2{grid-template-columns:1fr}}
+@media (max-width:1100px){.work,.grid2{grid-template-columns:1fr}}
 @media (max-width:640px){main{padding:12px}.card{padding:14px}nav.tabs{top:auto;position:static}}
 </style>
 </head>
