@@ -1377,12 +1377,14 @@
     const own = FBL.user.isOwner;
     let h = '<div class="card"><div class="section-title"><span>ระบบควบคุมการเข้าใช้งาน</span><span class="sp"></span><span class="count-chip">เจ้าหน้าที่ ' + team.length + ' คน</span></div>';
     if (FBL.demo) h += '<div class="demo-note">โหมดทดลอง — จัดการทีมได้หลังเชื่อมต่อ Firebase (ดูไฟล์ คู่มือติดตั้ง-อ่านก่อน.md)</div>';
-    h += '<div class="tm-list">' + team.map(function (t) {
-      const role = t.isOwner ? 'เจ้าของระบบ' : t.isAdmin ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่';
-      return '<div class="tm-row"><span class="tm-who"><span>' + esc(t.name) + (t.isOwner ? ' 👑' : t.isAdmin ? ' 🛡️' : '') + '</span><small class="tm-sub">' + role + '</small></span>' +
+    const tmRow = function (t) {
+      return '<div class="tm-row"><span class="tm-who"><span>' + esc(t.name) + (t.isOwner ? ' 👑' : t.isAdmin ? ' 🛡️' : '') + '</span></span>' +
         (own && !FBL.demo ? '<span class="tm-acts">' + (t.isOwner ? '' : '<button class="btn btn-outline btn-sm" data-adm="' + esc(t.name) + '">' + (t.isAdmin ? 'ยกเลิกผู้ดูแล' : 'ตั้งเป็นผู้ดูแล') + '</button>') +
           '<button class="btn btn-outline btn-sm" data-rpw="' + esc(t.name) + '">ตั้งรหัสผ่านใหม่</button>' + (t.isOwner ? '' : '<button class="btn btn-danger btn-sm" data-rmm="' + esc(t.name) + '">ลบ</button>') + '</span>' : '') + '</div>';
-    }).join('') + '</div>';
+    };
+    const tmOwners = team.filter(function (t) { return t.isOwner; }), tmStaff = team.filter(function (t) { return !t.isOwner; });
+    h += '<div class="tm-list">' + (tmOwners.length ? '<div class="tm-grp">เจ้าของระบบ</div>' + tmOwners.map(tmRow).join('') : '') +
+      (tmStaff.length ? '<div class="tm-grp">เจ้าหน้าที่</div>' + tmStaff.map(tmRow).join('') : '') + '</div>';
     if (own && !FBL.demo) h += '<button class="btn btn-outline btn-sm" id="nmAdd" style="margin-top:14px">+ เพิ่มเจ้าหน้าที่</button><div id="dirNotice"></div>';
     else if (!own) h += '<p class="set-hint">ติดต่อเจ้าของระบบเพื่อขอเพิ่มชื่อหรือรีเซ็ตรหัสผ่าน</p>';
     h += '</div>';
