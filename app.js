@@ -1049,20 +1049,18 @@
     const months = RE.fyMonths(fy);
     const carryIdx = plan.carryMk ? RE.fyIndex(plan.carryMk) : -1;
     const cum = RE.cumulative(plan, S.records, S.mk);
-    let h = '<div class="card"><div class="card-head"><h2>แผนงบประมาณบำรุงปกติ ปีงบประมาณ ' + fy + '</h2><div class="sp"></div>' +
+    let h = '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><div class="card-head"><h2>แผนงบประมาณบำรุงปกติ ปีงบประมาณ ' + fy + '</h2><div class="sp"></div>' +
       (can ? '<button class="btn btn-primary" id="savePlan">บันทึกแผน</button>' : '<span class="pill info">แก้ไขได้เฉพาะเจ้าของระบบ/ผู้ดูแลระบบ</span>') + '</div>' +
-      (can ? '<p class="small muted" style="margin-bottom:14px">นำเข้าไฟล์รายงานแผน-ผลจากระบบของแขวง (เช่น report01.csv) ได้ที่แท็บ ① นำเข้าข้อมูล — วางรวมกับ Export_CSV ได้เลย ระบบแยกชนิดไฟล์ให้เอง</p>' : '') +
-      '<div><h3 style="margin-bottom:8px">แผนและผลตามกลุ่มงาน</h3><div class="tbl-wrap"><table class="tbl"><tr><th>กลุ่มงาน</th><th class="num">แผน (บาท)</th><th class="num">ผลสะสมยกมา</th><th class="num">ผลสะสม ณ ' + esc(RE.mkShort(S.mk)) + '</th></tr>';
+      '<div><h3 style="margin-bottom:8px">แผนและผลตามกลุ่มงาน</h3><div class="tbl-wrap"><table class="tbl tbl-plan"><colgroup><col class="c1"><col><col><col></colgroup><tr><th>กลุ่มงาน</th><th class="num">แผน (บาท)</th><th class="num">ผลสะสมยกมา</th><th class="num">ผลสะสม ณ ' + esc(RE.mkShort(S.mk)) + '</th></tr>';
     RE.GROUPS.forEach(function (g) {
       h += '<tr><td><span class="pill" style="background:#' + g.color + ';color:#fff">' + g.code + '</span> ' + esc(g.name) + '</td>' +
         '<td><input type="text" inputmode="decimal" class="num" data-pg="' + g.code + '" value="' + esc(fmtIn((plan.groups || {})[g.code])) + '"' + dis + '></td>' +
         '<td><input type="text" inputmode="decimal" class="num" data-cg="' + g.code + '" value="' + esc(fmtIn((plan.carryGroups || {})[g.code])) + '"' + (can && carryIdx >= 0 ? '' : ' disabled') + '></td>' +
-        '<td class="num" data-res="' + g.code + '">' + RE.fmt(cum.groups[g.code] || 0) + '</td></tr>';
+        '<td class="num"><span class="res-box" data-res="' + g.code + '">' + RE.fmt(cum.groups[g.code] || 0) + '</span></td></tr>';
     });
-    h += '<tr class="tot"><td>รวม</td><td class="num" id="planTot">' + RE.fmt(cum.planTotal) + '</td><td></td><td class="num" id="resTot">' + RE.fmt(cum.resultTotal) + '</td></tr></table></div>' +
-      '<div style="margin-top:14px"><label class="f">ข้อมูลก่อนเริ่มใช้ระบบนี้: มีผลสะสมจากระบบแขวงถึงเดือน</label><select id="carryMk"' + dis + '><option value="">ไม่มี — เริ่มใช้ระบบตั้งแต่ ต.ค. (ต้นปีงบ)</option>' +
-      months.map(function (m) { return '<option value="' + m + '"' + (m === plan.carryMk ? ' selected' : '') + '>' + RE.mkLabel(m) + '</option>'; }).join('') + '</select>' +
-      '<p class="small muted">ถ้าเริ่มใช้ระบบกลางปีงบ ให้เลือกเดือนสุดท้ายที่ยังไม่ได้นำเข้า CSV แล้วกรอก "ผลสะสมยกมา" รายกลุ่ม (จากระบบของแขวง) — เดือนหลังจากนั้นระบบคำนวณจาก CSV ที่นำเข้าเอง</p></div></div></div>' +
+    h += '<tr class="tot"><td>รวม</td><td class="num" id="planTot">' + RE.fmt(cum.planTotal) + '</td><td></td><td class="num"><span class="res-box" id="resTot">' + RE.fmt(cum.resultTotal) + '</span></td></tr></table></div>' +
+      '<div style="margin-top:14px"><label class="f">ข้อมูลก่อนเริ่มใช้ระบบนี้: มีผลสะสมจากระบบแขวงถึงเดือน</label><select id="carryMk" class="carry-sel"' + dis + '><option value="">ไม่มี — เริ่มใช้ระบบตั้งแต่ ต.ค. (ต้นปีงบ)</option>' +
+      months.map(function (m) { return '<option value="' + m + '"' + (m === plan.carryMk ? ' selected' : '') + '>' + RE.mkLabel(m) + '</option>'; }).join('') + '</select></div></div></div>' +
       // ตัวอย่าง 3 หน้าเรียงบนลงล่าง (ตามลำดับในไฟล์ PowerPoint) — ภาพใหญ่ ตรวจง่าย
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 1: สรุปผลงานบำรุงปกติ ประจำเดือน</h3><div id="planPrev0"></div></div>' +
       '<div class="card" style="max-width:1100px;margin-left:auto;margin-right:auto"><h3 style="margin-bottom:10px">ตัวอย่างหน้าที่ 2: แผน-ผล ตามรหัสงาน</h3><div id="planPrev1"></div>' +
