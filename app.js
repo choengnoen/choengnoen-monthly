@@ -1420,7 +1420,8 @@
       'ฐานข้อมูล: ' + (FBL.demo ? '<b>โหมดทดลอง (เก็บในเครื่องนี้)</b>' : 'Firebase Firestore') + ' · ที่เก็บรูป: ' + (FBL.photoStore === 'drive' ? 'Google Drive' : 'Firestore') + ' · สายทางจากฐานข้อมูลกลาง CN-Hub: ' + (window.CNMaster && CNMaster.routes && CNMaster.routes().length ? 'เชื่อมต่อแล้ว (' + CNMaster.routes().length + ' สาย)' : 'ยังไม่เชื่อมต่อ — ใช้ชื่อตอนสำรอง') + '</div></div></div>';
     p.innerHTML = h;
     renderDirNotice();
-    if (#btnOpenTrash) #btnOpenTrash.onclick = openTrash;
+    const btnTrash = $('#btnOpenTrash');
+    if (btnTrash) btnTrash.onclick = openTrash;
     $$('[data-clr]', p).forEach(function (b) {
       b.onclick = async function () {
         const m = b.getAttribute('data-clr');
